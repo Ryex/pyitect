@@ -228,7 +228,8 @@ class System(object):
             
             #markers for the high and low version of the range
             #an empty string will mean infinite and the bool indicates if the value is inclusive
-            highv = lowv = ("", False)
+            highv =  ("", False) 
+            lowv = ("", False)
             
             #if the ends of the range are seperated with a dash
             if " - " in version_range:
@@ -256,22 +257,30 @@ class System(object):
                     equalto = (part[1] == "=")
                     if part[0] == ">":
                         wakagreaterflag = True
-                        lowv = (part[1:], equalto)
+                        lowv = (part[1:].lstrip("="), equalto)
                     elif part[0] == "<":
                         wakaleserflag = True
-                        highv = (part[1:], equalto)
+                        highv = (part[1:].lstrip("="), equalto)
                         
                 if not (wakagreaterflag and wakaleserflag):
                     raise RuntimeError("In versions useing the implicit and of a space (" ") between verison statements, all parts must include  either a greater or lesser-than symbolat their begining, both must be in use")
                 
             else:
                 # we only have one version statment
-                statment = version_range.strip()
-                highv = lowv = (statment, True)
-                
+                statment = version_range.strip().lstrip("=")
+                equalto = (statment[1] == "=")
+                if statment[0] == ">":
+                    wakagreaterflag = True
+                    lowv = (statment[1:], equalto)
+                elif statment[0] == "<":
+                    wakaleserflag = True
+                    highv = (statment[1:], equalto)
+                elif statment != "*" and statment != "":
+                    highv = lowv = (statment, True)
+            
             # now we parse the high and low versions to make them compairable and find a suitable version
-            highv = (parse_version(highv[0]), highv[1])
-            lowv = (parse_version(lowv[0]), lowv[1])
+            highv = (highv[0], parse_version(highv[0]), highv[1])
+            lowv = (lowv[0], parse_version(lowv[0]), lowv[1])
             
             # sorted from highest to lowest
             sorted_versions = sorted(self.components[component][plugin], key=operator.itemgetter(1), reverse=True)
@@ -279,24 +288,29 @@ class System(object):
             #loop striping off verisons that are too high or too low
             while True:
                 stripdone = False
-                #if the high value is inclusive
-                if highv[1]:
-                    if sorted_versions[0][1] >= highv[0]:
-                        sorted_versions = sorted_versions[1:]
-                        stripdone = True
-                else:
-                    if sorted_versions[0][1] > highv[0]:
-                        sorted_versions = sorted_versions[1:]
-                        stripdone = True
-                # if the low value is inclusive
-                if lowv[1]:
-                    if sorted_versions[len(sorted_versions) - 1][1] <= lowv[0]:
-                        sorted_versions = sorted_versions[:len(sorted_versions) - 1]
-                        stripdone = True
-                else:
-                    if sorted_versions[len(sorted_versions) - 1][1] < lowv[0]:
-                        sorted_versions = sorted_versions[:len(sorted_versions) - 1]
-                        stripdone = True
+                #if there is even a limit
+                if highv[0] != "":
+                    #if the high value is inclusive
+                    if highv[2]:
+                        if sorted_versions[0][1] > highv[1]:
+                            sorted_versions = sorted_versions[1:]
+                            stripdone = True
+                    else:
+                        if sorted_versions[0][1] >= highv[1]:
+                            sorted_versions = sorted_versions[1:]
+                            stripdone = True
+                            
+                #if there is even a limit
+                if lowv[0] != "":
+                    # if the low value is inclusive
+                    if lowv[2]:
+                        if sorted_versions[len(sorted_versions) - 1][1] < lowv[1]:
+                            sorted_versions = sorted_versions[:len(sorted_versions) - 1]
+                            stripdone = True
+                    else:
+                        if sorted_versions[len(sorted_versions) - 1][1] <= lowv[1]:
+                            sorted_versions = sorted_versions[:len(sorted_versions) - 1]
+                            stripdone = True
                         
                 if not stripdone:
                     break
@@ -304,7 +318,7 @@ class System(object):
             if len(sorted_versions) < 1:
                 raise RuntimeError("Component '%s' does not have any providers that meet requierments" % component)
                 
-            result = (plugin, sorted_versions[0])
+            result = (plugin, sorted_versions[0][0])
             return result
                 
             
