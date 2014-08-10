@@ -1,18 +1,70 @@
+Pyitect
+-------
 
-    ,-----.,--.                  ,--. ,---.   ,--.,------.  ,------.
-    '  .--./|  | ,---. ,--.,--. ,-|  || o   \  |  ||  .-.  \ |  .---'
-    |  |    |  || .-. ||  ||  |' .-. |`..'  |  |  ||  |  \  :|  `--, 
-    '  '--'\|  |' '-' ''  ''  '\ `-' | .'  /   |  ||  '--'  /|  `---.
-     `-----'`--' `---'  `----'  `---'  `--'    `--'`-------' `------'
-    ----------------------------------------------------------------- 
+A [architect](https://github.com/c9/architect) inspired plugin framework for Python 3.4+
 
+a plugin to pyitect is simply a folder with a .json file of the same name inside
+    
+    /Im-A-Plugin
+        Im-A-Plugin.json
+        file.py
+        
+A plugin has a name, a version, an author, a .py file, and it provides Components uses to build your aplication. components are simply names in the module's namespace after the file is imported
 
-Hi there! Welcome to Cloud9 IDE!
+a plugin's json file provides information about the plugin as well as lists components it provides and components it needs on load
 
-To get you started, create some files, play with the terminal,
-or visit http://docs.c9.io for our documentation.
-If you want, you can also go watch some training videos at
-http://www.youtube.com/user/c9ide.
+here's an example, all feilds are manditory but the consumes and provides CAN be left as empty containers, but then the plugin would be useless would it not? not providing and components and all?
+    
+    {
+        "name": "Im-A-Plugin",
+        "author": "Ryex",
+        "version": "0.0.1",
+        "file" : "file.py",
+        "consumes": {
+            "foo" : "*"
+        },
+        "provides": [
+            "Bar"
+        ]
+    }
+    
+a plugin can provid version requierments for the components it's importing
 
-Happy coding!
-The Cloud9 IDE team
+a version string is formated liek so
+
+    plugin_name:version_requierments
+    
+both parts are optional and an empty stirng or a string contaiing only an '*' means no requierment
+a version requierment can include logical operators to get version greater than or less than the spesifiyed value, you can evem select ranges
+
+here are some examples
+    
+    ""
+    "*"
+    "FooPlugin"
+    "FooPlugin:*"
+    "FooPlugin:1"
+    "FooPlugin:1.0"
+    "FooPlugin:1.0.1"
+    "FooPlugin:1.0.1-pre123"
+    "FooPlugin:1.0.1.1"
+    "FooPlugin:1.2"
+    "FooPlugin:>1.0" // greater than 1.0
+    "FooPlugin:>=1.2.3" // greater than or equal to 1.2.3
+    "FooPlugin:<=2.1.4" // less than or equal to 2.1.4
+    "FooPlugin:>1.0 <2.3" // greater than 1.0 and less than 2.3
+    "FooPlugin:1.0.5 - 2.4.5" // between 1.0.5 and 2.3.x inclusive
+    "FooPlugin:1.0 || 2.5.1" // either 1.0.x or 2.5.1
+    "FooPlugin:1.0 || 2.3.3 - 3.1.0 || >=4.3 <5.2.6-pre25" // get real complicated, cause you know, you might need it.
+    
+    
+inside your plugin files you need to get acess to your consumed components right?
+heres how you do it
+
+    #file.py
+    from PyitectConsumes import foo
+    
+    class Bar(object):
+        def __init__():
+            foo("it's a good day to be a plugin")
+    
