@@ -5,9 +5,9 @@ local_file = lambda *f: \
 
 setup(
     name = "pyitect",
-    version = "0.1",
+    version = "0.1.10",
     packages = find_packages(exclude=['*test*']),
-    scripts = ['pyitect.py'],
+    install_requires=["setuptools >= 1.0"],
 
     package_data = {
         '': ['*.txt', '*.rst', '*.md'],

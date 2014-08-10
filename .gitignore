@@ -1,3 +1,11 @@
 *.c9
 *.pyc
 *.pyo
+.coverage
+docs/_build
+build/
+dist/
+pyitect.egg-info/
+*.sublime-project
+*.sublime-workspace
+pyitect-*.tar.gz
