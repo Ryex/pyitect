@@ -39,16 +39,16 @@ a version requierment can include logical operators to get version greater than 
 
 here are some examples
     
-    ""
-    "*"
-    "FooPlugin"
-    "FooPlugin:*"
-    "FooPlugin:1"
-    "FooPlugin:1.0"
-    "FooPlugin:1.0.1"
-    "FooPlugin:1.0.1-pre123"
-    "FooPlugin:1.0.1.1"
-    "FooPlugin:1.2"
+    ""  // no requierment
+    "*" // no requierment
+    "FooPlugin" // from this plugin and no other, but any version
+    "FooPlugin:*" // from this plugin and no other, but any version
+    "FooPlugin:1" // from this plugin and no other, verison 1.x.x 
+    "FooPlugin:1.0" // 1.0.x
+    "FooPlugin:1.0.1" // version 1.0.1 or any post releace 
+    "FooPlugin:1.0.1-pre123" // 1.0.1-pre123 -> this exact version
+    "FooPlugin:1.0.1.1" // oh did I not menchin that your version strings cna basicly go on forever? chouse your own style!
+    "FooPlugin:1.2" // 1.2.x and any pre/post/dev releace
     "FooPlugin:>1.0" // greater than 1.0
     "FooPlugin:>=1.2.3" // greater than or equal to 1.2.3
     "FooPlugin:<=2.1.4" // less than or equal to 2.1.4
