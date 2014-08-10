@@ -261,7 +261,7 @@ class System(object):
                         wakaleserflag = True
                         highv = (part[1:], equalto)
                         
-                if not wakagreaterflag and wakaleserflag:
+                if not (wakagreaterflag and wakaleserflag):
                     raise RuntimeError("In versions useing the implicit and of a space (" ") between verison statements, all parts must include  either a greater or lesser-than symbolat their begining, both must be in use")
                 
             else:
