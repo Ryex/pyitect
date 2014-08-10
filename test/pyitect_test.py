@@ -1,0 +1,8 @@
+import pyitect                                                                                                                                                                                                                                         
+import json                                                                                                                                                                                                                                            
+cfgfile = open("config.json")                                                                                                                                                                                                                                            
+cfg = json.load(cfgfile)                                                                                                                                                                                                                                            
+system = pyitect.System(cfg)                                                                                                                                                                                                                                            
+system.search("test/plugins")                                                                                                                                                                                                                                            
+bar = system.load("bar")
+bar()

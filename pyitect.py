@@ -8,6 +8,12 @@ from pkg_resources import parse_version
 import operator
 import itertools
 
+class Namespace(object):
+    """
+    dummy class to hold namespaces during plugin loading
+    """
+    pass
+
 def expand_version_requierment(version):
         """
         Takes a string of one of the following forms:
@@ -23,16 +29,17 @@ def expand_version_requierment(version):
         ("plugin_name", "") -> plugin_name but no version requierment
         ("plugin_name", "verison_ranges")
         """
-        if verison == "*" or version == "":
-            return None
-        else if ":" in version:
+        if version == "*" or version == "":
+            return ("", "")
+        elif ":" in version:
             parts = version.split(":")
             if len(parts) != 2:
                 raise RuntimeError("Version requierments can only contain at most 2 parts, one plugin_name and one set of version requierments, the parts seperated by a ':'")
-            return { parts[0]: parts[1] }
+            return (parts[0], parts[1] )
         else:
-            return { version: None }
-            
+            return (version,  "")
+
+         
 
 class Plugin(object):
     """
@@ -40,35 +47,35 @@ class Plugin(object):
     """
     
     def __init__(self, config, path):
-        if hasattr(config, 'name'):
-            self.name = config.name
+        if 'name' in config:
+            self.name = config['name']
         else:
             raise RuntimeError("Plugin as %s does not have a name" % path)
-        if hasattr(config, 'author'):
-            self.author = config.author
+        if 'author' in config:
+            self.author = config['author']
         else:
             raise RuntimeError("Plugin as %s does not have an author" % path)
-        if hasattr(config, 'version'):
+        if 'version' in config:
             #store both the original version string and a parsed version that can be compaired accurately
-            self.version = (config.version, parse_version(config.version))
+            self.version = (config['version'], parse_version(config['version']))
         else:
             raise RuntimeError("Plugin as %s does not have a version" % path)
-        if hasattr(config, 'file'):
-            self.file = config.file
+        if 'file' in config:
+            self.file = config['file']
         else:
             raise RuntimeError("Plugin as %s does not have a plugin file spesified" % path)
-        if hasattr(config, 'consumes') and isinstance(config.consumes, collections.Mapping):
-            self.consumes = config.consumes
+        if 'consumes' in config and isinstance(config['consumes'], collections.Mapping):
+            self.consumes = config['consumes']
         else:
-            raise RuntimeError("Plugin as %s does not have a maping of consumed components to versions" % path)
-        if hasattr(config, 'provides') and isinstance(config.provides, collections.Mapping):
-            self.provides = config.provides
+            raise RuntimeError("Plugin as %s does not have a maping of consumed components to plugin versions" % path)
+        if 'provides' in config and isinstance(config['provides'], collections.Iterable):
+            self.provides = config['provides']
         else:
-            raise RuntimeError("Plugin as %s does not have a maping of provided components to versions" % path)
+            raise RuntimeError("Plugin as %s does not have a list provided components" % path)
         self.path = path
         
     def load(self):
-        filepath = importlib.find_loader(os.path.join(self.path, self.name))
+        filepath = os.path.join(self.path, self.file)
         spec = importlib.util.spec_from_file_location(self.name, filepath)
         plugin = spec.loader.load_module()
         return plugin
@@ -123,13 +130,13 @@ class System(object):
             cfgfile = open(cfgpath)
             cfg = json.load(cfgfile)
             
-            if hasattr(cfg, 'name'):
+            if 'name' in cfg:
                 # ensure we have a place to map the version to the config 
-                if not cfg.name in self.plugins:
-                    self.plugins[cfg.name] = {}
+                if not cfg['name'] in self.plugins:
+                    self.plugins[cfg['name']] = {}
                 # map the name and vserion to the config, use only the version string not the full tuple
                 plugin = Plugin(cfg, path)
-                self.plugins[cfg.name][cfg.version] = plugin
+                self.plugins[cfg['name']][cfg['version']] = plugin
                 self.map_components(plugin)
             else:
                 raise RuntimeError("Plugin at %s has no name" % path)
@@ -144,8 +151,8 @@ class System(object):
         names = os.listdir(path)
         name = os.path.basename(path) + ".json"
         if name in names:
-            return true
-        return false
+            return True
+        return False
         
     def search_dir(self, path):
         """
@@ -200,7 +207,7 @@ class System(object):
             
         if version == "":
             # sort the versions for the plugin and chouse the highest one, get only the version string
-            version = sorted(self.components[component][plugin], key=operator.itemgetter(1) reverse=True)[0][0]
+            version = sorted(self.components[component][plugin], key=operator.itemgetter(1), reverse=True)[0][0]
             # if we've fallen back to the highest version we know of then there is no point veryifying it's existance, we know of it after all
             result = (plugin, version)
             return result
@@ -217,7 +224,7 @@ class System(object):
             version_ranges.append(version)
             
         # loop untill we run out of ranges to test or find a winner
-        for version_range in version ranges:
+        for version_range in version_ranges:
             
             #markers for the high and low version of the range
             #an empty string will mean infinite and the bool indicates if the value is inclusive
@@ -234,7 +241,7 @@ class System(object):
                     raise RuntimeError("Version ranges defined with a '-' can must included exactly 2 versions, a high and a low")
                 highv = (high_low[0], True)
                 lowv = (high_low[1], True)
-            else if " " in version_range:
+            elif " " in version_range:
                 parts = version_range.split(" ")
                 
                 if len(parts) != 2:
@@ -250,7 +257,7 @@ class System(object):
                     if part[0] == ">":
                         wakagreaterflag = True
                         lowv = (part[1:], equalto)
-                    else if part[0] == "<":
+                    elif part[0] == "<":
                         wakaleserflag = True
                         highv = (part[1:], equalto)
                         
@@ -267,7 +274,7 @@ class System(object):
             lowv = (parse_version(lowv[0]), lowv[1])
             
             # sorted from highest to lowest
-            sorted_versions = sorted(self.components[component][plugin], key=operator.itemgetter(1) reverse=True)
+            sorted_versions = sorted(self.components[component][plugin], key=operator.itemgetter(1), reverse=True)
             
             #loop striping off verisons that are too high or too low
             while True:
@@ -340,12 +347,12 @@ class System(object):
                 self.loaded_plugins[plugin] = {}
             if not version in self.loaded_plugins[plugin]:
                 #we'll use this to store the needed components for the plugin we'll be loading
-                consumes = {}
+                consumes = Namespace.__new__(Namespace)
                 
                 plugin_cfg = self.plugins[plugin][version]
                 
                 for component_req in plugin_cfg.consumes.keys():
-                    consumes[component_req] = self.load(component_req, plugin_cfg.consumes)
+                    setattr(consumes, component_req, self.load(component_req, plugin_cfg.consumes))
                     
                 sys.modules["PyitectConsumes"] = consumes
                 self.loaded_plugins[plugin][version] = plugin_cfg.load()

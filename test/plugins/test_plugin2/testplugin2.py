@@ -1,5 +1,5 @@
 from PyitectConsumes import foo
 
-def bar()
+def bar():
     foo()
     print("and hello from test plugin 2")
