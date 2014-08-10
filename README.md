@@ -67,4 +67,17 @@ heres how you do it
     class Bar(object):
         def __init__():
             foo("it's a good day to be a plugin")
+            
+
+
+Here's how you set up a plugin system
+
+    from pyitect import System
+    #incase you need to spesify versions for plugins that dont have a default
+    #or you need to besure a spesfic version is used, 
+    #you can suply a mapping of compoent names to version strings on system setup
+    system = System({foo: "*"}) 
     
+    system.search("path/to/your/plugins/tree")
+    
+    Bar = system.load("Bar")
