@@ -90,7 +90,7 @@ class System(object):
     def __init__(self, config):
         """
         set up the system and load a configuration that may spesify plugins and versions to use for spesifc components
-        plugins can define their own requerments that superseed the system configuration
+        plugins can define their own requerments but they are superceeded by the system configuration (carefull you can break it)
         """
         
         if not isinstance(config, collections.Mapping):
@@ -313,7 +313,7 @@ class System(object):
         processes loading and returns the component by name, 
         chain loading any required plugins to obtain dependencies. 
         Uses the config that was provided on system creation to load correct versions, 
-        if there is aconflist throws a run time error.
+        if there is a conflist throws a run time error.
         """
         #set default requierments
         plugin = version = plugin_req = version_req = ""
@@ -324,9 +324,10 @@ class System(object):
         
         # merge the systems config and the passed plugin requierments (if they were passed) to get the most relavent requierments
         reqs = {}
-        reqs.update(self.config)
+        
         if not requierments is None:
             reqs.update(requierments)
+        reqs.update(self.config)
         
         # update the plugin and version requierments if they exist
         if component in reqs:
@@ -363,5 +364,13 @@ class System(object):
                 raise RuntimeError("Plugin '%s:%s' dose not have component '%s'" % (plugin, version, component) )
                 
             self.loaded_components[component][plugin][version] = getattr(plugin_obj, component)
+            
+        #record the use of this component, perhaps so the users can save the configuration
+        if not component in self.useing:
+            self.useing[component] = {}
+        if not plugin in self.useing[component]:
+            self.useing[component][plugin] = []
+        if not version in self.useing[component][plugin]:
+            self.useing[component][plugin].append(version)
             
         return self.loaded_components[component][plugin][version]
