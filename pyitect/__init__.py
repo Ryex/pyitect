@@ -1,8 +1,8 @@
 """
-Pyitect is a pluginframe work 
+Pyitect is a pluginframe work
 """
 
-__version__ = "0.1.10"
+__version__ = "0.1.14"
 
 from .pyitect import System
 
