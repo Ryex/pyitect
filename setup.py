@@ -6,19 +6,15 @@ local_file = lambda *f: \
 
 setup(
     name = "pyitect",
-    version = "0.1.14",
+    version = "0.1.15",
     packages = find_packages(exclude=['*test*']),
     install_requires=["setuptools >= 1.0"],
-
-    package_data = {
-        '': ['*.txt', '*.rst', '*.md'],
-    },
-
+    include_package_data=True,
     # metadata for upload to PyPI
     author = "Ryexander",
     author_email = "Ryexander@gmail.com",
     description = "A package for structuring a modeler project architecture via plugin like modules",
-    long_description = local_file("README.md"),
+    long_description = local_file("README.rst"),
     license = "ISC",
     keywords = "architect project modeler plugin",
     url = "https://github.com/Ryex/pyitect",
