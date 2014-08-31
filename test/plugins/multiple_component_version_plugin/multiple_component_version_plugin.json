@@ -1,0 +1,12 @@
+{
+    "name": "multiple_component_version_plugin",
+    "author": "Ryex",
+    "version": "0.0.1",
+    "file" : "multiple_version.py",
+    "consumes": {
+        
+    },
+    "provides": {
+        "test" : "test_type_1 = test1 | test_type_2 = test2 | test_type_3 = test3"
+    }
+}

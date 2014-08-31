@@ -6,7 +6,7 @@
     "consumes": {
         
     },
-    "provides": [
-        "foo"
-    ]
+    "provides": {
+        "foo" : ""
+    }
 }
