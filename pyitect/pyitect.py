@@ -6,7 +6,6 @@ import collections
 import warnings
 from pkg_resources import parse_version
 import operator
-import itertools
 
 class Namespace(object):
     """
@@ -163,7 +162,7 @@ class System(object):
             for function in self.events[name]:
                 function(*args, **kwargs)
 
-    def map_component(self, component, plugin, version):
+    def _map_component(self, component, plugin, version):
         # either add the version or create a new array with the version and save it
         if isinstance(version, str):
             version = (version, parse_version(version))
@@ -172,7 +171,7 @@ class System(object):
         else:
             self.components[component][plugin] = [version, ]
 
-    def map_components(self, plugin_cfg):
+    def _map_components(self, plugin_cfg):
         """
         takes a plugins meta data and remembers it's provided components so they system is awear of them
         """
@@ -212,13 +211,13 @@ class System(object):
             if mapping:
                 mappings = mapping.split("|")
                 if len(mappings) < 1:
-                    self.map_component(component, plugin_cfg.name, map_postfix(mappings))
+                    self._map_component(component, plugin_cfg.name, map_postfix(mappings))
                 for pair in mappings:
-                    self.map_component(component, plugin_cfg.name, map_postfix(pair))
+                    self._map_component(component, plugin_cfg.name, map_postfix(pair))
             else:
-                self.map_component(component, plugin_cfg.name, plugin_cfg.version)
+                self._map_component(component, plugin_cfg.name, plugin_cfg.version)
 
-    def add_plugin(self, path):
+    def _add_plugin(self, path):
         """
         adds a plugin form the provided path
         """
@@ -234,14 +233,14 @@ class System(object):
                 # map the name and vserion to the config, use only the version string not the full tuple
                 plugin = Plugin(cfg, path)
                 self.plugins[cfg['name']][cfg['version']] = plugin
-                self.map_components(plugin)
+                self._map_components(plugin)
                 self.fire_event('plugin_found', path, plugin.get_version_string())
             else:
                 raise RuntimeError("Plugin at %s has no name" % path)
         else:
             raise RuntimeError("No plugin exists at %s" % path)
 
-    def identify_plugin(self, path):
+    def _identify_plugin(self, path):
         """
         returns true if there is a plugin in the folder pointed to by path
         """
@@ -252,20 +251,23 @@ class System(object):
             return True
         return False
 
-    def search_dir(self, path):
+    def _search_dir(self, path):
         """
         recursivly searches a folder for plugins
         """
-        # get the file names in the folder
-        names = os.listdir(path)
-        # loop through and identify plugins searching folders recursivly, stops recursive if there is a plugin in the folder.
-        for name in names:
-            file = os.path.join(path, name)
-            if os.path.isdir(file):
-                if self.identify_plugin(file):
-                    self.add_plugin(file)
-                else:
-                    self.search_dir(path)
+        #avoid recursion, could get nasty in a sificently big tree, also faster.
+        paths = [path, ]
+        while len(paths) > 0:
+            # get the file names in the folder
+            names = os.listdir(paths.pop(0))
+            # loop through and identify plugins searching folders recursivly, stops recursive if there is a plugin in the folder.
+            for name in names:
+                file = os.path.join(path, name)
+                if os.path.isdir(file):
+                    if self._identify_plugin(file):
+                        self._add_plugin(file)
+                    else:
+                        paths.append(file)
 
     def search(self, path):
         """
@@ -275,9 +277,9 @@ class System(object):
         # if it's a file is there a plugin in the folder containing it?
         # if it's a folder are the plugins located somewhere within?
         if os.path.isdir(path):
-            self.search_dir(path)
+            self._search_dir(path)
         else:
-            self.add_plugin(os.path.dirname(path))
+            self._add_plugin(os.path.dirname(path))
 
     def resolve_highest_match(self, component, plugin, version):
         """
