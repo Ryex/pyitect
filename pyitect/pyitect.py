@@ -251,15 +251,16 @@ class System(object):
             return True
         return False
 
-    def _search_dir(self, path):
+    def _search_dir(self, folder):
         """
         recursivly searches a folder for plugins
         """
         #avoid recursion, could get nasty in a sificently big tree, also faster.
-        paths = [path, ]
+        paths = [folder, ]
         while len(paths) > 0:
             # get the file names in the folder
-            names = os.listdir(paths.pop(0))
+            path = paths.pop(0)
+            names = os.listdir(path)
             # loop through and identify plugins searching folders recursivly, stops recursive if there is a plugin in the folder.
             for name in names:
                 file = os.path.join(path, name)
