@@ -16,7 +16,7 @@ except ImportError:
 
 setup(
     name = "pyitect",
-    version = "0.5.3",
+    version = "0.5.4",
     packages = find_packages(exclude=['*test*']),
     install_requires=["setuptools >= 1.0"],
     include_package_data=True,
