@@ -70,29 +70,57 @@ class Plugin(object):
     def supports_import_mode():
         return sys.hexversion >= 0x030400F0
 
+    def _load_import(self):
+        #import mode can handle situations where the file isn't a python source file,
+        #for example a compiled pyhton module in the form of a .pyd or .so
+        #only works wiht pyhton 3.4+
+        filepath = os.path.join(self.path, self.file)
+        try:
+            sys.path.insert(0, self.path)
+            spec = importlib.util.spec_from_file_location(self.name, filepath)
+            plugin = spec.loader.load_module()
+            sys.path.remove(self.path)
+        except Exception as err:
+            raise RuntimeError("Plugin '%s' at '%s' failed to load" % (self.name, self.path)) from err
+
+        return plugin
+
+    def _load_exec(self):
+        filepath = os.path.join(self.path, self.file)
+        module_name = os.path.splitext(self.file)[0]
+        #exec mode requieres the file to be raw python
+        package = False
+        if module_name == '__init__':
+            module_name = os.path.basename(self.path)
+            package = True
+        try:
+            plugin = types.ModuleType(module_name)
+            if package:
+                plugin.__package__ = module_name
+                plugin.__path__ = [self.path]
+                sys.modules[module_name] = plugin
+            else:
+                plugin.__package__ = None
+            sys.path.insert(0, self.path)
+            with open(filepath) as f:
+                code = compile(f.read(), self.file, 'exec')
+                exec(code, plugin.__dict__)
+            sys.path.remove(self.path)
+            if package:
+                del sys.modules[module_name]
+        except Exception as err:
+            raise RuntimeError("Plugin '%s' at '%s' failed to load" % (self.name, self.path)) from err
+
+        return plugin
+
     def load(self):
         """loads the plugin file and returns the resulting module"""
-        filepath = os.path.join(self.path, self.file)
         if self.mode == 'import':
-            #import mode can handle situations where the file isn't a python source file, for example a compiled pyhton module in the form of a .pyd or .so
-            try:
-                sys.path.insert(0, self.path)
-                spec = importlib.util.spec_from_file_location(self.name, filepath)
-                plugin = spec.loader.load_module()
-                sys.path.remove(self.path)
-            except Exception as err:
-                raise RuntimeError("Plugin '%s' at '%s' failed to load" % (self.name, self.path)) from err
+            plugin = self._load_import()
         elif self.mode =='exec':
-            #exec mode requieres the file to be raw python
-            try:
-                plugin = types.ModuleType(self.name)
-                sys.path.insert(0, self.path)
-                with open(filepath) as f:
-                    code = compile(f.read(), self.file, 'exec')
-                    exec(code, plugin.__dict__)
-                sys.path.remove(self.path)
-            except Exception as err:
-                raise RuntimeError("Plugin '%s' at '%s' failed to load" % (self.name, self.path)) from err
+            plugin = self._load_exec()
+        else:
+            raise RuntimeError("Bad load mode '%s' for Plugin '%s' at '%s': 'import' and 'exec' allowed" % (self.mode, self.name, self.path))
         return plugin
 
     def get_version_string(self):
@@ -297,7 +325,7 @@ class System(object):
         "" -> no version requierment
         "*" -> no version requierment
         "plugin_name" -> spesfic plugin no version requierment
-        "plugin_name:version_ranges" -> spesfic plugin version matches requierments
+        "plugin_name:version_ranges" -> spesfic plugin version matches requirements
 
         and returns one of the following:
 
@@ -310,14 +338,14 @@ class System(object):
         elif ":" in version:
             parts = version.split(":")
             if len(parts) != 2:
-                raise RuntimeError("Version requierments can only contain at most 2 parts, one plugin_name and one set of version requierments, the parts seperated by a ':'")
+                raise RuntimeError("Version requirements can only contain at most 2 parts, one plugin_name and one set of version requirements, the parts seperated by a ':'")
             return (parts[0], parts[1] )
         else:
             return (version,  "")
 
     def resolve_highest_match(self, component, plugin, version):
         """
-        resolves the latest version of a component with requierments, passing empty strings means no requierments
+        resolves the latest version of a component with requirements, passing empty strings means no requirements
 
         `version` Must match `version` exactly
         `>version` Must be greater than `version`
@@ -349,7 +377,7 @@ class System(object):
         if not plugin in self.components[component]:
             raise RuntimeError("Component '%s' is not provided by 'plugin' %s" % (component, plugin))
 
-        # our requierments might pass if we satify one of a number of version ranges
+        # our requirements might pass if we satify one of a number of version ranges
         version_ranges = []
         if " || " in version:
             # there are two or more version ranges, either could be satisfied
@@ -453,20 +481,20 @@ class System(object):
                     break
 
             if len(sorted_versions) < 1:
-                raise RuntimeError("Component '%s' does not have any providers that meet requierments" % component)
+                raise RuntimeError("Component '%s' does not have any providers that meet requirements" % component)
 
             result = (plugin, sorted_versions[0][0])
             return result
 
-    def ittrPluginsByComponent(self, component, requierments=None):
+    def ittrPluginsByComponent(self, component, requirements=None):
         """
         iterates over the all possible providers of a component returning the plugin name and the highest version possible.
         if there are postfix version mappings for a component in a plugin iterates over them too.
         """
         for plugin_name, versions in self.components[component].items():
             version_req = ""
-            if not requierments is None and plugin_name in requierments:
-                version_req = requierments[plugin_name]
+            if not requirements is None and plugin_name in requirements:
+                version_req = requirements[plugin_name]
             plugin, version = self.resolve_highest_match(component, plugin_name, version_req)
             if plugin in self.postfix_mappings:
                 if component in self.postfix_mappings[plugin]:
@@ -533,7 +561,7 @@ class System(object):
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
 
-    def load(self, component, requierments=None, requesting=None):
+    def load(self, component, requirements=None, requesting=None):
         """
         processes loading and returns the component by name,
         chain loading any required plugins to obtain dependencies.
@@ -541,20 +569,20 @@ class System(object):
         if there is a conflist throws a run time error.
         bypass lets the call pypass the system configuration
         """
-        #set default requierments
+        #set default requirements
         plugin = version = plugin_req = version_req = ""
         if not component in self.components:
             raise RuntimeError("Component '%s' not provided by any loaded plugins" % component)
 
 
-        # merge the systems config and the passed plugin requierments (if they were passed) to get the most relavent requierments
+        # merge the systems config and the passed plugin requirements (if they were passed) to get the most relavent requirements
         reqs = {}
 
         reqs.update(self.config)
-        if not requierments is None:
-            reqs.update(requierments)
+        if not requirements is None:
+            reqs.update(requirements)
 
-        # update the plugin and version requierments if they exist
+        # update the plugin and version requirements if they exist
         if component in reqs:
             plugin_req, version_req = System.expand_version_requierment(reqs[component])
         else:

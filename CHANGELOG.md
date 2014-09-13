@@ -1,3 +1,7 @@
+v0.6.2
+------
+realative imports now work so long as the target file for loading is named `__init__.py` to triger python to treat the plugin folder as a package
+
 v0.6.1
 -----
 refactored System.load out to make use of two smaller functions, easyer to maintain

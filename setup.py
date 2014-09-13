@@ -3,7 +3,7 @@ import os
 
 local_file = lambda *f: \
     open(os.path.join(os.path.dirname(__file__), *f)).read()
-    
+
 try:
     from pypandoc import convert
     output = convert("README.md", 'rst')
@@ -16,7 +16,7 @@ except ImportError:
 
 setup(
     name = "pyitect",
-    version = "0.6.1",
+    version = "0.6.2",
     packages = find_packages(exclude=['*test*']),
     install_requires=["setuptools >= 1.0"],
     include_package_data=True,
@@ -35,7 +35,7 @@ setup(
         "Development Status :: 4 - Beta",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
- 
+
         "License :: OSI Approved :: ISC License (ISCL)",
         "Intended Audience :: Developers",
         "Intended Audience :: Information Technology",

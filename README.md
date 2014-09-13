@@ -5,26 +5,26 @@ A [architect](https://github.com/c9/architect) inspired plugin framework for Pyt
 
 #Table Of Contents
 
-* [What is a Plugin](#whatis)
-* [Version Requierments](#vers)
-* [Letting plugins access consumed Components](#access)
-* [Setting up a Plugin system](#setup)
-* [Plugin Loading Modes](#modes)
-    * [import](#modes_import)
-    * [exec](#modes_exec)
-* [Loading multiple versions of one component](#multi)
-* [Tracking loaded Components](#tracking)
+* [What is a Plugin](#what-is-a-plugin)
+* [Version Requirements](#version-requirements)
+* [Letting plugins access consumed Components](#letting-plugins-access-consumed-components)
+* [Setting up a Plugin system](#setting-up-a-plugin-system)
+* [Plugin Loading Modes](#plugin-loading-modes)
+    * [import](import)
+    * [exec](#exec)
+* [Loading multiple versions of one component](#loading-multiple-versions-of-one-component)
+* [Tracking loaded Components](#tracking-loaded-components)
 * [Events](#events)
-    * [plugin_found](#events_plugin_found)
-    * [plugin_loaded](#events_plugin_loaded)
-    * [component_loaded](#events_component_loaded)
-* [Providing multiple versions of a component from the same plugin](#multivers)
-* [Iterating over avalible plugin versions](#ittr)
+    * [plugin_found](#plugin_found)
+    * [plugin_loaded](#plugin_loaded)
+    * [component_loaded](#component_loaded)
+* [Providing multiple versions of a component from the same plugin](#providing-multiple-versions-of-a-component-from-the-same-plugin)
+* [Iterating over available plugin versions](#iterating-over-avalible-plugin-versions)
 * [Examples](#examples)
-* [LICENSE](#LICENSE)
+* [LICENSE](#license)
 
 
-<a id="whatis"></a>What is a Plugin? 
+<a id="what-is-a-plugin"></a>What is a Plugin?
 -----------------
 
 a plugin to pyitect is simply a folder with a .json file of the same name inside
@@ -33,11 +33,11 @@ a plugin to pyitect is simply a folder with a .json file of the same name inside
         Im-A-Plugin.json
         file.py
 
-A plugin has a name, a version, an author, a .py file, and it provides Components used to build your aplication. components are simply names in the module's namespace after the file is imported
+A plugin has a name, a version, an author, a .py file, and it provides Components used to build your application. components are simply names in the module's namespace after the file is imported
 
 a plugin's json file provides information about the plugin as well as lists components it provides and components it needs on load
 
-here's an example, all feilds are manditory but the consumes and provides CAN be left as empty containers, but then the plugin would be useless would it not? not providing components and all?
+here's an example, all fields are mandatory but the consumes and provides CAN be left as empty containers, but then the plugin would be useless would it not? not providing components and all?
 
     {
         "name": "Im-A-Plugin",
@@ -52,40 +52,40 @@ here's an example, all feilds are manditory but the consumes and provides CAN be
             "Bar": ""
         }
     }
-    
+
  * **name** -> the name of the plugin (No spaces)
  * **author** -> the author of the plugin
- * **version** -> a version for the plugin, a string that can be any form set up tools suports
+ * **version** -> a version for the plugin, a string that can be any form set up tools supports
  * **file** -> a path to the file that when imported will provide a module who's namespace contains all provided plugins
- * **mode** -> (OPTIONAL) defaults to `'import'` on pyhton 3.4 and up `'ecec'` otherwise: sets the import mode
- * **consumes** -> a maping of needed component names to version strings, empty string = no requierment
+ * **mode** -> (OPTIONAL) defaults to `'import'` on python 3.4 and up `'ecec'` otherwise: sets the import mode
+ * **consumes** -> a mapping of needed component names to version strings, empty string = no requirement
  * **provides** -> a mapping of provided component names to [prefix mappings](#multivers)
 
 
-<a id="vers"></a>Version Requierments 
+<a id="version-requierments"></a>Version Requierments
 --------------------
 
-a plugin can provid version requierments for the components it's importing
+a plugin can provide version requirements for the components it's importing
 
-a version string is formated like so
+a version string is formatted like so
 
-    plugin_name:version_requierments
+    plugin_name:version_requirements
 
-both parts are optional and an empty stirng or a string contaiing only an '*' means no requierment
-a version requierment can include logical operators to get version greater than or less than the spesifiyed value, you can evem select ranges
+both parts are optional and an empty string or a string containing only an '*' means no requirement
+a version requirement can include logical operators to get version greater than or less than the specified value, you can evem select ranges
 
 here are some examples
 
-    ""  // no requierment
+    ""  // no requirement
     "*" // no requierment
     "FooPlugin" // from this plugin and no other, but any version
     "FooPlugin:*" // from this plugin and no other, but any version
-    "FooPlugin:1" // from this plugin and no other, verison 1.x.x
+    "FooPlugin:1" // from this plugin and no other, version 1.x.x
     "FooPlugin:1.0" // 1.0.x
-    "FooPlugin:1.0.1" // version 1.0.1 or any post releace
+    "FooPlugin:1.0.1" // version 1.0.1 or any post release
     "FooPlugin:1.0.1-pre123" // 1.0.1-pre123 -> this exact version
-    "FooPlugin:1.0.1.1" // oh did I mention that your version strings can basicly go on forever? chouse your own style!
-    "FooPlugin:1.2" // 1.2.x and any pre/post/dev releace
+    "FooPlugin:1.0.1.1" // oh did I mention that your version strings can basically go on forever? choose your own style!
+    "FooPlugin:1.2" // 1.2.x and any pre/post/dev release
     "FooPlugin:>1.0" // greater than 1.0
     "FooPlugin:>=1.2.3" // greater than or equal to 1.2.3
     "FooPlugin:<=2.1.4" // less than or equal to 2.1.4
@@ -94,17 +94,17 @@ here are some examples
     "FooPlugin:1.0 || 2.5.1" // either 1.0.x or 2.5.1
     "FooPlugin:1.0 || 2.3.3 - 3.1.0 || >=4.3 <5.2.6-pre25" // get real complicated, cause you know, you might need it.
 
-pyitect uses `parse_version` from the `pkg_resources` module (part of setuptools) to turn version strings into tuples that are then compaired lexagraphicaly
+pyitect uses `parse_version` from the `pkg_resources` module (part of setuptools) to turn version strings into tuples that are then compared lexagraphicaly
 so any version string system that works with setuptools works here
 
 learn more from the [parse_version docs](https://pythonhosted.org/setuptools/pkg_resources.html#id33)
 
 
-<a id="access"></a>Letting plugins access consumed Components 
+<a id="letting-plugins-access-consumed-components"></a>Letting plugins access consumed Components
 ------------------------------------------
 
-inside your plugin files you need to get acess to your consumed components right?
-heres how you do it
+inside your plugin files you need to get access to your consumed components right?
+here's how you do it
 
     #file.py
     from PyitectConsumes import foo
@@ -115,54 +115,58 @@ heres how you do it
 
 
 
-<a id="setup"></a>Setting up a Plugin system 
+<a id="setting-up-a-plugin-system"></a>Setting up a Plugin system
 --------------------------
 
 Here's how you set up a plugin system
 
     from pyitect import System
-    #incase you need to spesify versions for plugins that dont have a default
-    #or you need to besure a spesfic version is used,
-    #you can suply a mapping of component names to version strings on system setup
+    #in case you need to specify versions for plugins that don't have a default
+    #or you need to be sure a specific version is used,
+    #you can supply a mapping of component names to version strings on system setup
     system = System({foo: "*"})
 
     system.search("path/to/your/plugins/tree")
 
     Bar = system.load("Bar")
 
-<a id="modes"></a>Plugin Loading Modes
+<a id="plugin-loading-modes"></a>Plugin Loading Modes
 ---------------------------------------
 
 Plugins can be loaded in two different modes `'import'` and `'exec'`. Both modes can be set in the plugin's json file just like any other optional
 
-### <a id="modes_import"></a>import mode
+### <a id="import"></a>import mode
 `'import'` mode requires, and is the default on, Python version 3.4 or higher. It uses the newly improved import lib to load the file pointed to in the plugin json with the `'file'` property.
-This lets the file to be loaded be any file python itself coud import, be it a compiled pyhton module in `.pyd` or `.so` form, a `.pyc` or `.pyo` compiled source file, or just a plain old `.py` source file.
+This lets the file to be loaded be any file python itself could import, be it a compiled python module in `.pyd` or `.so` form, a `.pyc` or `.pyo` compiled source file, or just a plain old `.py` source file.
 
-### <a id="modes_exec"></a>exec mode
-loads plugins by compileing the provided source file into a code object and executing the code object inside a blank Module object. 
-This efectivly recreates an import process by it's limited in that it can only load raw python source not compiled `.pyc` or `.pyo`
-
+### <a id="exec"></a>exec mode
+loads plugins by compiling the provided source file into a code object and executing the code object inside a blank Module object.
+This effectively recreates an import process by it's limited in that it can only load raw python source not compiled `.pyc` or `.pyo`
+__init
 ### both
 in both cases relative imports DO NOT WORK. the plugin folder is temporarily added to the search path so absolute imports work but relatives will not.
 
+UNLESS the name of the file is `__init__.py` . In this special case the plugin folder is reconsidered as a python package and relative imports work as normal. exec mode does it's best to recognize this case by testing for the file name `__init__.py` and then setting __name__ and __package__ of the executed module to the folder name and temporarily injecting the module into sys.modules.
 
-<a id="multi"></a>Loading multiple versions of one component 
+Pyitect does it's best to isolate plugins from the rest of the program by keeping clean namespaces but this is no substitute for good security only load know plugins.
+
+
+<a id="loading-multiple-versions-of-one-component"></a>Loading multiple versions of one component
 -----------------------------------------
 
 There are times when you might want to load more than one version of a plugin at once. why?
 well lets say you have a `tool` component that does some function on a piece of data, what function? not important
 but if you say wanted to extend the system to also allow an number of other functions on that same data, perhaps some function provided by a 3d party.
-how do make it so that all avalible functions are loaded?
+how do make it so that all available functions are loaded?
 
 Pyitect lets you classify all these as a single components with different versions and then load them all.
 
-    System.load(component, requierments={'component': 'plugin:version'})
+    System.load(component, requirements={'component': 'plugin:version'})
 
-in this case the requierments for the component can be set to load a spesfic version from one plugin, bypassing the default from the system.
+in this case the requirements for the component can be set to load a spesfic version from one plugin, bypassing the default from the system.
 
 
-<a id="tracking"></a>Tracking loaded Components 
+<a id="tracking-loaded-components"></a>Tracking loaded Components
 ---------------------------
 Pyitect tracks used components at anytime `System.useing` can be inspected to find all
 components that have been requested and from what plugins they have been loaded along with versions
@@ -187,10 +191,10 @@ The plugin system also includes a simple event system bount to the `System` obje
 it simply allows one to register a function to an event name and when `System.fire_event`
 is called it calls all registered functions passing the extra args and kwargs to them
 
-pyitect fires some event internaly so that you can keep track of when the system finds and loads plugins
+pyitect fires some event internally so that you can keep track of when the system finds and loads plugins
 
 
-#### <a id="events_plugin_found"></a>'plugin_found'
+### <a id="plugin_found"></a>plugin_found
 a function bound to this event gets called every time a plugin is found during a search called
 an example is provided:
 
@@ -201,7 +205,7 @@ an example is provided:
         """
         print("plugin `%s` found at `%s`" % (plugin, path))
 
-#### <a id="events_plugin_loaded"></a>'plugin_loaded'
+### <a id="plugin_loaded"></a>plugin_loaded
 a function bound to this event is called every time a new plugin is loaded during a component load
 example:
 
@@ -213,7 +217,7 @@ example:
         """
         print("plugin `%s` was loaded by plugin `%s` during a request for the `%s` component" % (plugin, plugin_required, component_needed))
 
-#### <a id="events_component_loaded"></a>'component_loaded'
+### <a id="component_loaded"></a>component_loaded
 a function bound to this event is called every time a component is sucessfuly loaded
 example:
 
@@ -225,13 +229,13 @@ example:
         """
         print("Component `%s` loaded, required by `%s`, loaded from `%s`" % (component, plugin_required, plugin_loaded) )
 
-<a id="multivers"></a>Providing multiple versions of a component from the same plugin
+<a id="providing-multiple-versions-of-a-component-from-the-same-plugin"></a>Providing multiple versions of a component from the same plugin
 ----------------------------------------------------------------
 
 what if you want to provide multiple versions of a component from the same plugin?
 if you have a system like in the Loading multiple versions of one component section above then you may want to provide multiple versions from one plugin
 
-this can be acomplished by providing a version postfix for the provided component and map it to the Global name it can be accesed from in the loaded module
+this can be accomplished by providing a version post-fix for the provided component and map it to the Global name it can be accessed from in the loaded module
 
 you may of noticed that provided components are mapped to a string
 
@@ -243,7 +247,7 @@ you may of noticed that provided components are mapped to a string
         }
     }
 
-that string is a postfix mapping, an empty string represent no mapping (the component is provided in the loaded module under the same name, no version postfix)
+that string is a post-fix mapping, an empty string represent no mapping (the component is provided in the loaded module under the same name, no version post-fix)
 
 if however we did this
 
@@ -257,8 +261,8 @@ if however we did this
         }
     }
 
-then a special version would be added to the system, verison `0.0.1-bar_type_1`, and when you required that version when loading the `Bar` component
-it would load the name `bar1` from the module loaded from the `Im-A-Plugin` plugin. More than one mapping can be provided by sperating them with teh pipe `|` charater
+then a special version would be added to the system, version `0.0.1-bar_type_1`, and when you required that version when loading the `Bar` component
+it would load the name `bar1` from the module loaded from the `Im-A-Plugin` plugin. More than one mapping can be provided by separating them with the pipe `|` character
 in this way more than one version can be provided.
 example:
 
@@ -272,7 +276,7 @@ example:
         }
     }
 
-creating versions mapings
+creating versions mappings
 
     0.0.1-bar_type_1 -> bar1
     0.0.1-bar_type_2 -> bar2
@@ -293,26 +297,26 @@ it is also possible to use the mapping to simple provide an alternate name to ac
         }
     }
 
-notice that the version postfix can be left out, as long as the `=` is there the capitalized name `FooBar` can be accessed via the lowercase name `foobar` but will still have the normal `0.0.1` version
+notice that the version post-fix can be left out, as long as the `=` is there the capitalized name `FooBar` can be accessed via the lowercase name `foobar` but will still have the normal `0.0.1` version
 
 the second one `BARFOO` wil create a `0.0.1-barfootype` version.
 
-<a id="ittr"></a>Iterating over avalible plugin versions
+<a id="iterating-over-available-plugin-versions"></a>Iterating over available plugin versions
 ---------------------------------------
 
-Pyitect provides an iterator function to iterate over avalible providers for a component `System.ittrPluginsByComponent`
+Pyitect provides an iterator function to iterate over available providers for a component `System.ittrPluginsByComponent`
 
-this function will loop over all pluign that provided the component and return a tulple of the plugin name and it's highest avalible version.
-if there are postfix mappings for the component on that plugin it will list them too.
+this function will loop over all plugin that provided the component and return a tulple of the plugin name and it's highest available version.
+if there are post-fix mappings for the component on that plugin it will list them too.
 
     for plugin, version in System.ittrPluginsByComponent('component_name'):
         print("Plugin %s provides The component at version %s" % (plugin, version))
 
 <a id="examples"></a>Examples
 --------
-For more information checkout the tests directory, it sould be a farily straight forward explination form there.
+For more information checkout the tests directory, it should be a fairly straight forward explanation form there.
 
-<a id="LICENSE"></a>LICENSE
+<a id="license"></a>LICENSE
 -------
 
 Copyright (c) 2014, Benjamin "Ryex" Powers <ryexander@gmail.com>
