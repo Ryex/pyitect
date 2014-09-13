@@ -8,30 +8,8 @@ import warnings
 from pkg_resources import parse_version
 import operator
 
-def expand_version_requierment(version):
-        """
-        Takes a string of one of the following forms:
 
-        "" -> no version requierment
-        "*" -> no version requierment
-        "plugin_name" -> spesfic plugin no version requierment
-        "plugin_name:version_ranges" -> spesfic plugin version matches requierments
 
-        and returns one of the following:
-
-        ("", "") -> no version requierment
-        ("plugin_name", "") -> plugin_name but no version requierment
-        ("plugin_name", "verison_ranges")
-        """
-        if version == "*" or version == "":
-            return ("", "")
-        elif ":" in version:
-            parts = version.split(":")
-            if len(parts) != 2:
-                raise RuntimeError("Version requierments can only contain at most 2 parts, one plugin_name and one set of version requierments, the parts seperated by a ':'")
-            return (parts[0], parts[1] )
-        else:
-            return (version,  "")
 
 
 
@@ -279,6 +257,32 @@ class System(object):
             self._search_dir(path)
         else:
             self._add_plugin(os.path.dirname(path))
+    
+    @staticmethod  
+    def expand_version_requierment(version):
+        """
+        Takes a string of one of the following forms:
+
+        "" -> no version requierment
+        "*" -> no version requierment
+        "plugin_name" -> spesfic plugin no version requierment
+        "plugin_name:version_ranges" -> spesfic plugin version matches requierments
+
+        and returns one of the following:
+
+        ("", "") -> no version requierment
+        ("plugin_name", "") -> plugin_name but no version requierment
+        ("plugin_name", "verison_ranges")
+        """
+        if version == "*" or version == "":
+            return ("", "")
+        elif ":" in version:
+            parts = version.split(":")
+            if len(parts) != 2:
+                raise RuntimeError("Version requierments can only contain at most 2 parts, one plugin_name and one set of version requierments, the parts seperated by a ':'")
+            return (parts[0], parts[1] )
+        else:
+            return (version,  "")
 
     def resolve_highest_match(self, component, plugin, version):
         """
@@ -521,7 +525,7 @@ class System(object):
 
         # update the plugin and version requierments if they exist
         if component in reqs:
-            plugin_req, version_req = expand_version_requierment(reqs[component])
+            plugin_req, version_req = System.expand_version_requierment(reqs[component])
         else:
             warnings.warn(RuntimeWarning("Component '%s' has no default provided, defaulting to alphabetical order" % component))
 
