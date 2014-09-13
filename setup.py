@@ -16,14 +16,14 @@ except ImportError:
 
 setup(
     name = "pyitect",
-    version = "0.5.4",
+    version = "0.6.1",
     packages = find_packages(exclude=['*test*']),
     install_requires=["setuptools >= 1.0"],
     include_package_data=True,
     # metadata for upload to PyPI
     author = "Ryexander",
     author_email = "Ryexander@gmail.com",
-    description = """A Simple system for structuring a modeler project architecture via plugin like modules, uses the new importlib abilities first avalible in python 3.4""",
+    description = """A Simple system for structuring a modeler project architecture via plugin like modules, uses the new importlib abilities first avalible in python 3.4, includes an exec load mode for support of pyhton 3.0+""",
     long_description = local_file("README.rst"),
     license = "ISC",
     keywords = "architect project modeler plugin",
@@ -35,7 +35,7 @@ setup(
         "Development Status :: 4 - Beta",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
+ 
         "License :: OSI Approved :: ISC License (ISCL)",
         "Intended Audience :: Developers",
         "Intended Audience :: Information Technology",

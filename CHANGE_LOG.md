@@ -1,4 +1,9 @@
-0.5.1
+v0.6.1
+-----
+refactored System.load out to make use of two smaller functions, easyer to maintain
+added plugin loading modes, import for py3.4+ and exec for suport of prievious python version
+
+v0.5.1
 -----
 added ability to provide more than one version of a compoent in the same plugin with potfix mapping
 event system added, system fire events
@@ -8,11 +13,11 @@ tests updates to test all features
 README update
 This changelog added
 
-0.1.15
+v0.1.15
 ------
 added ittrPluginsByComponent
 added bypass peram to System.load to bypass system default
 
-0.1.10
+v0.1.10
 ------
 First public release

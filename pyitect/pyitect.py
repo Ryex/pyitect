@@ -33,35 +33,66 @@ class Plugin(object):
         if 'name' in config:
             self.name = config['name'].strip()
         else:
-            raise RuntimeError("Plugin as %s does not have a name" % path)
-        if 'author' in config:
+            raise RuntimeError("Plugin as '%s' does not have a name string" % path)
+        if 'author' in config and isinstance(config['author'], str):
             self.author = config['author'].strip()
         else:
-            raise RuntimeError("Plugin as %s does not have an author" % path)
+            raise RuntimeError("Plugin as '%s' does not have a author string" % path)
         if 'version' in config:
             #store both the original version string and a parsed version that can be compaired accurately
             self.version = (config['version'].strip(), parse_version(config['version'].strip()))
         else:
-            raise RuntimeError("Plugin as %s does not have a version" % path)
+            raise RuntimeError("Plugin at '%s' does not have a version" % path)
         if 'file' in config:
             self.file = config['file'].strip()
         else:
-            raise RuntimeError("Plugin as %s does not have a plugin file spesified" % path)
+            raise RuntimeError("Plugin as '%s' does not have a plugin file spesified" % path)
         if 'consumes' in config and isinstance(config['consumes'], collections.Mapping):
             self.consumes = config['consumes']
         else:
-            raise RuntimeError("Plugin as %s does not have a mapping of consumed components to plugin versions" % path)
+            raise RuntimeError("Plugin at '%s'does not have a mapping of consumed components to plugin versions" % path)
         if 'provides' in config and isinstance(config['provides'], collections.Mapping):
             self.provides = config['provides']
         else:
-            raise RuntimeError("Plugin as %s does not have a mapping of provided components to version postfixes" % path)
+            raise RuntimeError("Plugin at '%s' does not have a mapping of provided components to version postfixes" % path)
+        if ('mode' in config and (config['mode'].lower() == 'import' or config['mode'] == 'exec' )):
+            self.mode = config['mode']
+            if self.mode == 'import' and not Plugin.supports_import_mode():
+                self.mode = 'exec'
+                warnings.warn(RuntimeWarning("Plugin at '%s' has set 'import' mode but this mode is only suported in python 3.4 and up, defaulting to 'exec' mode" % path))
+        elif not ('mode' in config):
+            self.mode = 'import' if Plugin.supports_import_mode() else 'exec'
+        else:
+            raise RuntimeError("Plugin at '%s' has bad mode, 'import' and 'exec' allowed" % path)
         self.path = path
+
+    @staticmethod
+    def supports_import_mode():
+        return sys.hexversion >= 0x030400F0
 
     def load(self):
         """loads the plugin file and returns the resulting module"""
         filepath = os.path.join(self.path, self.file)
-        spec = importlib.util.spec_from_file_location(self.name, filepath)
-        plugin = spec.loader.load_module()
+        if self.mode == 'import':
+            #import mode can handle situations where the file isn't a python source file, for example a compiled pyhton module in the form of a .pyd or .so
+            try:
+                sys.path.insert(0, self.path)
+                spec = importlib.util.spec_from_file_location(self.name, filepath)
+                plugin = spec.loader.load_module()
+                sys.path.remove(self.path)
+            except Exception as err:
+                raise RuntimeError("Plugin '%s' at '%s' failed to load" % (self.name, self.path)) from err
+        elif self.mode =='exec':
+            #exec mode requieres the file to be raw python
+            try:
+                plugin = types.ModuleType(self.name)
+                sys.path.insert(0, self.path)
+                with open(filepath) as f:
+                    code = compile(f.read(), self.file, 'exec')
+                    exec(code, plugin.__dict__)
+                sys.path.remove(self.path)
+            except Exception as err:
+                raise RuntimeError("Plugin '%s' at '%s' failed to load" % (self.name, self.path)) from err
         return plugin
 
     def get_version_string(self):
@@ -257,8 +288,8 @@ class System(object):
             self._search_dir(path)
         else:
             self._add_plugin(os.path.dirname(path))
-    
-    @staticmethod  
+
+    @staticmethod
     def expand_version_requierment(version):
         """
         Takes a string of one of the following forms:
@@ -448,9 +479,9 @@ class System(object):
                    yield (plugin, version)
             else:
                 yield (plugin, version)
-                
+
     def _load_component(self, component, plugin, version, requesting=None):
-        
+
         # be sure not to load things twice, but besure the components is loaded and saved
         if not component in self.loaded_components:
             self.loaded_components[component] = {}
@@ -475,12 +506,12 @@ class System(object):
                 self.useing[component][plugin] = []
             if not version in self.useing[component][plugin]:
                 self.useing[component][plugin].append(version)
-                
+
             self.fire_event('component_loaded', component, requesting, plugin + ":" + version)
-        
+
         component_obj = self.loaded_components[component][plugin][version]
         return component_obj
-                
+
     def _load_plugin(self, plugin, version, requesting=None, component=None):
         #we dont want to load a plugin twice just becasue it provides more than one component, save previouly loaded plugins
         if not plugin in self.loaded_plugins:
@@ -498,7 +529,7 @@ class System(object):
             self.loaded_plugins[plugin][version] = plugin_cfg.load()
             del sys.modules["PyitectConsumes"]
             self.fire_event('plugin_loded', plugin_cfg.get_version_string(), requesting, component)
-            
+
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
 
@@ -531,7 +562,7 @@ class System(object):
 
         # get the plugin and version to load
         plugin, version = self.resolve_highest_match(component, plugin_req, version_req)
-        
+
         component = self._load_component(component, plugin, version)
-        
+
         return component

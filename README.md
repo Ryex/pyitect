@@ -3,7 +3,28 @@ Pyitect
 
 A [architect](https://github.com/c9/architect) inspired plugin framework for Python 3.4+ (3.4+ is required because of the use of the new import lib abilities)
 
-What is a Plugin?
+#Table Of Contents
+
+* [What is a Plugin](#whatis)
+* [Version Requierments](#vers)
+* [Letting plugins access consumed Components](#access)
+* [Setting up a Plugin system](#setup)
+* [Plugin Loading Modes](#modes)
+    * [import](#modes_import)
+    * [exec](#modes_exec)
+* [Loading multiple versions of one component](#multi)
+* [Tracking loaded Components](#tracking)
+* [Events](#events)
+    * [plugin_found](#events_plugin_found)
+    * [plugin_loaded](#events_plugin_loaded)
+    * [component_loaded](#events_component_loaded)
+* [Providing multiple versions of a component from the same plugin](#multivers)
+* [Iterating over avalible plugin versions](#ittr)
+* [Examples](#examples)
+* [LICENSE](#LICENSE)
+
+
+<a id="whatis"></a>What is a Plugin? 
 -----------------
 
 a plugin to pyitect is simply a folder with a .json file of the same name inside
@@ -23,6 +44,7 @@ here's an example, all feilds are manditory but the consumes and provides CAN be
         "author": "Ryex",
         "version": "0.0.1",
         "file" : "file.py",
+        "mode" : "import" // optional either 'import' or 'exec'
         "consumes": {
             "foo" : ""
         },
@@ -30,9 +52,17 @@ here's an example, all feilds are manditory but the consumes and provides CAN be
             "Bar": ""
         }
     }
+    
+ * **name** -> the name of the plugin (No spaces)
+ * **author** -> the author of the plugin
+ * **version** -> a version for the plugin, a string that can be any form set up tools suports
+ * **file** -> a path to the file that when imported will provide a module who's namespace contains all provided plugins
+ * **mode** -> (OPTIONAL) defaults to `'import'` on pyhton 3.4 and up `'ecec'` otherwise: sets the import mode
+ * **consumes** -> a maping of needed component names to version strings, empty string = no requierment
+ * **provides** -> a mapping of provided component names to [prefix mappings](#multivers)
 
 
-Version Requierments
+<a id="vers"></a>Version Requierments 
 --------------------
 
 a plugin can provid version requierments for the components it's importing
@@ -70,7 +100,7 @@ so any version string system that works with setuptools works here
 learn more from the [parse_version docs](https://pythonhosted.org/setuptools/pkg_resources.html#id33)
 
 
-Letting plugins access consumed Components
+<a id="access"></a>Letting plugins access consumed Components 
 ------------------------------------------
 
 inside your plugin files you need to get acess to your consumed components right?
@@ -85,7 +115,7 @@ heres how you do it
 
 
 
-Setting up a Plugin system
+<a id="setup"></a>Setting up a Plugin system 
 --------------------------
 
 Here's how you set up a plugin system
@@ -100,8 +130,24 @@ Here's how you set up a plugin system
 
     Bar = system.load("Bar")
 
+<a id="modes"></a>Plugin Loading Modes
+---------------------------------------
 
-Loading multiple versions of one component
+Plugins can be loaded in two different modes `'import'` and `'exec'`. Both modes can be set in the plugin's json file just like any other optional
+
+### <a id="modes_import"></a>import mode
+`'import'` mode requires, and is the default on, Python version 3.4 or higher. It uses the newly improved import lib to load the file pointed to in the plugin json with the `'file'` property.
+This lets the file to be loaded be any file python itself coud import, be it a compiled pyhton module in `.pyd` or `.so` form, a `.pyc` or `.pyo` compiled source file, or just a plain old `.py` source file.
+
+### <a id="modes_exec"></a>exec mode
+loads plugins by compileing the provided source file into a code object and executing the code object inside a blank Module object. 
+This efectivly recreates an import process by it's limited in that it can only load raw python source not compiled `.pyc` or `.pyo`
+
+### both
+in both cases relative imports DO NOT WORK. the plugin folder is temporarily added to the search path so absolute imports work but relatives will not.
+
+
+<a id="multi"></a>Loading multiple versions of one component 
 -----------------------------------------
 
 There are times when you might want to load more than one version of a plugin at once. why?
@@ -116,7 +162,7 @@ Pyitect lets you classify all these as a single components with different versio
 in this case the requierments for the component can be set to load a spesfic version from one plugin, bypassing the default from the system.
 
 
-Tracking loaded Components
+<a id="tracking"></a>Tracking loaded Components 
 ---------------------------
 Pyitect tracks used components at anytime `System.useing` can be inspected to find all
 components that have been requested and from what plugins they have been loaded along with versions
@@ -135,7 +181,7 @@ here is an example where more than one version of a component is active
     }
 
 
-Events
+<a id="events"></a>Events
 -------
 The plugin system also includes a simple event system bount to the `System` object,
 it simply allows one to register a function to an event name and when `System.fire_event`
@@ -144,7 +190,7 @@ is called it calls all registered functions passing the extra args and kwargs to
 pyitect fires some event internaly so that you can keep track of when the system finds and loads plugins
 
 
-#### 'plugin_found'
+#### <a id="events_plugin_found"></a>'plugin_found'
 a function bound to this event gets called every time a plugin is found during a search called
 an example is provided:
 
@@ -155,7 +201,7 @@ an example is provided:
         """
         print("plugin `%s` found at `%s`" % (plugin, path))
 
-#### 'plugin_loaded'
+#### <a id="events_plugin_loaded"></a>'plugin_loaded'
 a function bound to this event is called every time a new plugin is loaded during a component load
 example:
 
@@ -167,7 +213,7 @@ example:
         """
         print("plugin `%s` was loaded by plugin `%s` during a request for the `%s` component" % (plugin, plugin_required, component_needed))
 
-#### 'component_loaded'
+#### <a id="events_component_loaded"></a>'component_loaded'
 a function bound to this event is called every time a component is sucessfuly loaded
 example:
 
@@ -179,7 +225,7 @@ example:
         """
         print("Component `%s` loaded, required by `%s`, loaded from `%s`" % (component, plugin_required, plugin_loaded) )
 
-Providing multiple versions of a component from the same plugin
+<a id="multivers"></a>Providing multiple versions of a component from the same plugin
 ----------------------------------------------------------------
 
 what if you want to provide multiple versions of a component from the same plugin?
@@ -251,7 +297,7 @@ notice that the version postfix can be left out, as long as the `=` is there the
 
 the second one `BARFOO` wil create a `0.0.1-barfootype` version.
 
-Iterating over avalible plugin versions
+<a id="ittr"></a>Iterating over avalible plugin versions
 ---------------------------------------
 
 Pyitect provides an iterator function to iterate over avalible providers for a component `System.ittrPluginsByComponent`
@@ -262,11 +308,11 @@ if there are postfix mappings for the component on that plugin it will list them
     for plugin, version in System.ittrPluginsByComponent('component_name'):
         print("Plugin %s provides The component at version %s" % (plugin, version))
 
-Examples
+<a id="examples"></a>Examples
 --------
 For more information checkout the tests directory, it sould be a farily straight forward explination form there.
 
-LICENSE
+<a id="LICENSE"></a>LICENSE
 -------
 
 Copyright (c) 2014, Benjamin "Ryex" Powers <ryexander@gmail.com>

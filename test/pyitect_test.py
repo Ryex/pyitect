@@ -55,3 +55,10 @@ for plugin, version in system.ittrPluginsByComponent("test"):
     print("\ncalling test\n")
     test()
     print("\n")
+
+print("\nImporting plugin via 'exec' \n")
+Exec_Foo_Echo = system.load("Exec_Foo_Echo")
+Exec_Foo_Echo("I am being echoed back by a plugin loaded via exec")
+
+Exec_Foo_Echo_Relative = system.load("Exec_Foo_Echo_Relative")
+Exec_Foo_Echo_Relative("This text should be printed by a absolute import method")
