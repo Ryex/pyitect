@@ -2,16 +2,11 @@ import importlib
 import json
 import sys
 import os
+import types
 import collections
 import warnings
 from pkg_resources import parse_version
 import operator
-
-class Namespace(object):
-    """
-    dummy class to hold namespaces during plugin loading
-    """
-    pass
 
 def expand_version_requierment(version):
         """
@@ -319,7 +314,7 @@ class System(object):
         if not plugin in self.components[component]:
             raise RuntimeError("Component '%s' is not provided by 'plugin' %s" % (component, plugin))
 
-        # our requerments might pass if we satify one of a number of version ranges
+        # our requierments might pass if we satify one of a number of version ranges
         version_ranges = []
         if " || " in version:
             # there are two or more version ranges, either could be satisfied
@@ -449,6 +444,59 @@ class System(object):
                    yield (plugin, version)
             else:
                 yield (plugin, version)
+                
+    def _load_component(self, component, plugin, version, requesting=None):
+        
+        # be sure not to load things twice, but besure the components is loaded and saved
+        if not component in self.loaded_components:
+            self.loaded_components[component] = {}
+        if not plugin in self.loaded_components[component]:
+            self.loaded_components[component][plugin] = {}
+        if not version in self.loaded_components[component][plugin]:
+
+            plugin_obj = self._load_plugin(plugin, version, requesting=requesting, component=component)
+
+            access_name = component
+            if plugin in self.postfix_mappings and component in self.postfix_mappings[plugin] and version in self.postfix_mappings[plugin][component]:
+                access_name = self.postfix_mappings[plugin][component][version]
+            if not hasattr(plugin_obj, access_name):
+                raise RuntimeError("Plugin '%s:%s' does not have name '%s'" % (plugin, version, access_name) )
+
+            self.loaded_components[component][plugin][version] = getattr(plugin_obj, access_name)
+
+            #record the use of this component, perhaps so the users can save the configuration
+            if not component in self.useing:
+                self.useing[component] = {}
+            if not plugin in self.useing[component]:
+                self.useing[component][plugin] = []
+            if not version in self.useing[component][plugin]:
+                self.useing[component][plugin].append(version)
+                
+            self.fire_event('component_loaded', component, requesting, plugin + ":" + version)
+        
+        component_obj = self.loaded_components[component][plugin][version]
+        return component_obj
+                
+    def _load_plugin(self, plugin, version, requesting=None, component=None):
+        #we dont want to load a plugin twice just becasue it provides more than one component, save previouly loaded plugins
+        if not plugin in self.loaded_plugins:
+            self.loaded_plugins[plugin] = {}
+        if not version in self.loaded_plugins[plugin]:
+            #create a blank module namespace to attach our equired components
+            consumes = types.ModuleType("PyitectConsumes")
+
+            plugin_cfg = self.plugins[plugin][version]
+
+            for component_req in plugin_cfg.consumes.keys():
+                setattr(consumes, component_req, self.load(component_req, plugin_cfg.consumes, requesting=plugin_cfg.get_version_string()))
+
+            sys.modules["PyitectConsumes"] = consumes
+            self.loaded_plugins[plugin][version] = plugin_cfg.load()
+            del sys.modules["PyitectConsumes"]
+            self.fire_event('plugin_loded', plugin_cfg.get_version_string(), requesting, component)
+            
+        plugin_obj = self.loaded_plugins[plugin][version]
+        return plugin_obj
 
     def load(self, component, requierments=None, requesting=None):
         """
@@ -471,7 +519,6 @@ class System(object):
         if not requierments is None:
             reqs.update(requierments)
 
-
         # update the plugin and version requierments if they exist
         if component in reqs:
             plugin_req, version_req = expand_version_requierment(reqs[component])
@@ -480,48 +527,7 @@ class System(object):
 
         # get the plugin and version to load
         plugin, version = self.resolve_highest_match(component, plugin_req, version_req)
-
-        # be sure not to load things twice, but besure the components is loaded and saved
-        if not component in self.loaded_components:
-            self.loaded_components[component] = {}
-        if not plugin in self.loaded_components[component]:
-            self.loaded_components[component][plugin] = {}
-        if not version in self.loaded_components[component][plugin]:
-
-            #we dont want to load a plugin twice just becasue it provides more than one component, save previouly loaded plugins
-            if not plugin in self.loaded_plugins:
-                self.loaded_plugins[plugin] = {}
-            if not version in self.loaded_plugins[plugin]:
-                #we'll use this to store the needed components for the plugin we'll be loading
-                consumes = Namespace.__new__(Namespace)
-
-                plugin_cfg = self.plugins[plugin][version]
-
-                for component_req in plugin_cfg.consumes.keys():
-                    setattr(consumes, component_req, self.load(component_req, plugin_cfg.consumes, requesting=plugin_cfg.get_version_string()))
-
-                sys.modules["PyitectConsumes"] = consumes
-                self.loaded_plugins[plugin][version] = plugin_cfg.load()
-                del sys.modules["PyitectConsumes"]
-                self.fire_event('plugin_loded', plugin_cfg.get_version_string(), requesting, component)
-
-            plugin_obj = self.loaded_plugins[plugin][version]
-
-            access_name = component
-            if plugin in self.postfix_mappings and component in self.postfix_mappings[plugin] and version in self.postfix_mappings[plugin][component]:
-                access_name = self.postfix_mappings[plugin][component][version]
-            if not hasattr(plugin_obj, access_name):
-                raise RuntimeError("Plugin '%s:%s' dose not have name '%s'" % (plugin, version, access_name) )
-
-            self.loaded_components[component][plugin][version] = getattr(plugin_obj, access_name)
-
-        #record the use of this component, perhaps so the users can save the configuration
-        if not component in self.useing:
-            self.useing[component] = {}
-        if not plugin in self.useing[component]:
-            self.useing[component][plugin] = []
-        if not version in self.useing[component][plugin]:
-            self.useing[component][plugin].append(version)
-
-        self.fire_event('component_loaded', component, requesting, plugin + ":" + version)
-        return self.loaded_components[component][plugin][version]
+        
+        component = self._load_component(component, plugin, version)
+        
+        return component
