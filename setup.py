@@ -4,19 +4,9 @@ import os
 local_file = lambda *f: \
     open(os.path.join(os.path.dirname(__file__), *f)).read()
 
-try:
-    from pypandoc import convert
-    output = convert("README.md", 'rst')
-    readme_rst = open("README.rst", "w")
-    readme_rst.write(output)
-    readme_rst.close()
-except ImportError:
-    print("warning: pypandoc module not found, could not convert Markdown to RST")
-
-
 setup(
     name = "pyitect",
-    version = "0.6.2",
+    version = "0.7.0",
     packages = find_packages(exclude=['*test*']),
     install_requires=["setuptools >= 1.0"],
     include_package_data=True,

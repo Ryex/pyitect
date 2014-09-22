@@ -1,3 +1,9 @@
+v0.7.0
+------
+plugins found with `System.search` are no longer auto enabeled
+use `System.enable_plugins(<mapping>|<iterable>|<Plugin>)` to enable plugins from `System.plugins`
+added `Plugin` class to main namespace
+
 v0.6.2
 ------
 realative imports now work so long as the target file for loading is named `__init__.py` to triger python to treat the plugin folder as a package

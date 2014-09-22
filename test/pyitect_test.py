@@ -38,8 +38,18 @@ system.bind_event('plugin_found', onPluginFound)
 system.bind_event('pluign_loaded', onPluginLoad)
 system.bind_event('component_loaded', onComponentLoad)
 
-print("\nSearching Pluing Path \n")
+print("\nSearching Plugin Path \n")
 system.search(os.path.join(folder_path, "plugins"))
+
+print("\nFiter out dead plugin before enableing plugins\n")
+plugins_filter = ["dead_plugin"]
+# get all plugin configs that arn't named dead_plugin
+# collect plugins[<name>][<version_str>] for all names n in plugins for all versions v in plugins[n] if name not in filter
+plugins = [system.plugins[n][v] for n in system.plugins for v in system.plugins[n] if n not in plugins_filter]
+
+print(plugins)
+
+system.enable_plugins(plugins)
 
 print("\nLoading `bar` component \n")
 bar = system.load("bar")
@@ -67,3 +77,11 @@ print("\nImporting relative import test plugin\n")
 TestClass = system.load("TestClass")
 t = TestClass("relative imports were a success")
 t.hello()
+
+print("\nAttempt to import dead plugin\n")
+
+try:
+    foobarbar = system.load("foobarbar")
+    foobarbar()
+except RuntimeError as err:
+    print("\ndead_plugin failed to load, this is intended\n")

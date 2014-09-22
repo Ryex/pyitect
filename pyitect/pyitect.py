@@ -127,6 +127,12 @@ class Plugin(object):
         """returns a version stirng"""
         return self.name + ":" + self.version[0]
 
+    def __str__(self):
+        return "Plugin %s:%s" % (self.name, self.version[0], self.path)
+
+    def __repr__(self):
+        return "Plugin<%s:%s>@%s" % (self.name, self.version[0], self.path)
+
 class System(object):
     """
     a plugin system
@@ -249,6 +255,30 @@ class System(object):
             else:
                 self._map_component(component, plugin_cfg.name, plugin_cfg.version)
 
+    def enable_plugins(self, plugins):
+        """
+        enables one or more plugins
+        """
+        if isinstance(plugins, collections.Mapping):
+            # passed a dictionary
+            for k in plugins:
+                plugin = plugins[k]
+                if not isinstance(plugin, Plugin):
+                    raise RuntimeError("Object '%s' is not a plugin" % str(plugin))
+                self._map_components(plugin)
+        elif isinstance(plugins, collections.Iterable):
+            # not a map but iterable
+            for plugin in plugins:
+                if not isinstance(plugin, Plugin):
+                    raise RuntimeError("Object '%s' is not a plugin" % str(plugin))
+                self._map_components(plugin)
+        else:
+            # single plugin
+            plugin = plugins
+            if not isinstance(plugin, Plugin):
+                raise RuntimeError("Object '%s' is not a plugin" % str(plugin))
+            self._map_components(plugin)
+
     def _add_plugin(self, path):
         """
         adds a plugin form the provided path
@@ -268,7 +298,6 @@ class System(object):
                 # map the name and vserion to the config, use only the version string not the full tuple
                 plugin = Plugin(cfg, path)
                 self.plugins[cfg['name']][cfg['version']] = plugin
-                self._map_components(plugin)
                 self.fire_event('plugin_found', path, plugin.get_version_string())
             else:
                 raise RuntimeError("Plugin at %s has no name" % path)
@@ -401,14 +430,14 @@ class System(object):
                 high_low = version_range.split(" - ")
                 #be sure we onyl have two versions
                 if len(high_low) != 2:
-                    raise RuntimeError("Version ranges defined with a '-' can must included exactly 2 versions, a high and a low")
+                    raise RuntimeError("Version ranges defined with a '-' must included exactly 2 versions, a high and a low")
                 highv = (high_low[0], True)
                 lowv = (high_low[1], True)
             elif " " in version_range:
                 parts = version_range.split(" ")
 
                 if len(parts) != 2:
-                   raise RuntimeError("In versions useing the implicit and of a space (" ") between verison statements, there may only be 2 version statments")
+                   raise RuntimeError("In versions useing the implicit `and` of a space (" ") between version statements, there may only be 2 version statments")
 
                 #they are useing implicit and, all parts must either include a > or a < +/- an =, both must be present
                 wakagreaterflag = False
@@ -425,7 +454,7 @@ class System(object):
                         highv = (part[1:].lstrip("="), equalto)
 
                 if not (wakagreaterflag and wakaleserflag):
-                    raise RuntimeError("In versions useing the implicit and of a space (" ") between verison statements, all parts must include  either a greater or lesser-than symbolat their begining, both must be in use")
+                    raise RuntimeError("In versions useing the implicit and of a space (" ") between version statements, all parts must include  either a greater or lesser-than symbolat their begining, both must be in use")
 
             else:
                 # we only have one version statment
@@ -572,7 +601,7 @@ class System(object):
         #set default requirements
         plugin = version = plugin_req = version_req = ""
         if not component in self.components:
-            raise RuntimeError("Component '%s' not provided by any loaded plugins" % component)
+            raise RuntimeError("Component '%s' not provided by any enabled plugins" % component)
 
 
         # merge the systems config and the passed plugin requirements (if they were passed) to get the most relavent requirements

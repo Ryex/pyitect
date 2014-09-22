@@ -3,7 +3,7 @@ Pyitect is a pluginframe work
 """
 
 
-__version__ = "0.6.2"
+__version__ = "0.7.0"
 
-from .pyitect import System
+from .pyitect import System, Plugin
 

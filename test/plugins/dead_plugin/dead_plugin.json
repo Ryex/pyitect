@@ -1,0 +1,13 @@
+{
+    "name": "dead_plugin",
+    "author": "Ryex",
+    "version": "0.0.1",
+    "file": "dead_plugin.py",
+    "mode": "exec",
+    "consumes": {
+
+    },
+    "provides": {
+        "foobarbar": ""
+    }
+}
