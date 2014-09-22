@@ -1,7 +1,7 @@
 Pyitect
 =======
 
-A `architect <https://github.com/c9/architect>`__ inspired plugin
+A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3
 
 .. contents:: Table of Contents
@@ -48,16 +48,11 @@ useless would it not? not providing components and all?
 
 -  **name** -> the name of the plugin (No spaces)
 -  **author** -> the author of the plugin
--  **version** -> a version for the plugin, a string that can be any
-   form set up tools supports
--  **file** -> a path to the file that when imported will provide a
-   module who's namespace contains all provided plugins
--  **mode** -> (OPTIONAL) defaults to ``'import'`` on python 3.4 and up
-   ``'ecec'`` otherwise: sets the import mode
--  **consumes** -> a mapping of needed component names to version
-   strings, empty string = no requirement
--  **provides** -> a mapping of provided component names to `prefix
-   mappings <#multivers>`__
+-  **version** -> a version for the plugin, a string that can be any form set up tools supports
+-  **file** -> a path to the file that when imported will provide a module who's namespace contains all provided plugins
+-  **mode** -> (OPTIONAL) defaults to `import` on python 3.4 and up `ecec` otherwise: sets the import mode
+-  **consumes** -> a mapping of needed component names to version strings, empty string = no requirement
+-  **provides** -> a mapping of provided component names to prefix mappings 
 
 Version Requierments
 --------------------
@@ -98,13 +93,12 @@ here are some examples
     "FooPlugin:1.0 || 2.5.1" // either 1.0.x or 2.5.1
     "FooPlugin:1.0 || 2.3.3 - 3.1.0 || >=4.3 <5.2.6-pre25" // get real complicated, cause you know, you might need it.
 
-pyitect uses ``parse_version`` from the ``pkg_resources`` module (part
+pyitect uses `parse_version` from the `pkg_resources` module (part
 of setuptools) to turn version strings into tuples that are then
 compared lexagraphicaly so any version string system that works with
 setuptools works here
 
-learn more from the `parse\_version
-docs <https://pythonhosted.org/setuptools/pkg_resources.html#id33>`__
+learn more from the `parse\_version docs <https://pythonhosted.org/setuptools/pkg_resources.html#id33>`_
 
 Letting plugins access consumed Components
 ------------------------------------------
@@ -154,19 +148,19 @@ Plugin components are not made available to the system until they are enabled.
 Plugin Loading Modes
 --------------------
 
-Plugins can be loaded in two different modes ``'import'`` and
-``'exec'``. Both modes can be set in the plugin's json file just like
+Plugins can be loaded in two different modes `import` and
+`exec`. Both modes can be set in the plugin's json file just like
 any other optional
 
 import mode
 ~~~~~~~~~~~
 
-``'import'`` mode requires, and is the default on, Python version 3.4 or
+`import` mode requires, and is the default on, Python version 3.4 or
 higher. It uses the newly improved import lib to load the file pointed
-to in the plugin json with the ``'file'`` property. This lets the file
+to in the plugin json with the `file` property. This lets the file
 to be loaded be any file python itself could import, be it a compiled
-python module in ``.pyd`` or ``.so`` form, a ``.pyc`` or ``.pyo``
-compiled source file, or just a plain old ``.py`` source file.
+python module in `.pyd` or `.so` form, a `.pyc` or `.pyo`
+compiled source file, or just a plain old `.py` source file.
 
 exec mode
 ~~~~~~~~~
@@ -174,15 +168,15 @@ exec mode
 loads plugins by compiling the provided source file into a code object
 and executing the code object inside a blank Module object. This
 effectively recreates an import process by it's limited in that it can
-only load raw python source not compiled ``.pyc`` or ``.pyo`` \_\_init
+only load raw python source not compiled `.pyc` or `.pyo` \_\_init
 ### both in both cases relative imports DO NOT WORK. the plugin folder
 is temporarily added to the search path so absolute imports work but
 relatives will not.
 
-UNLESS the name of the file is ``__init__.py`` . In this special case
+UNLESS the name of the file is `__init__.py` . In this special case
 the plugin folder is reconsidered as a python package and relative
 imports work as normal. exec mode does it's best to recognize this case
-by testing for the file name ``__init__.py`` and then setting **name**
+by testing for the file name `__init__.py` and then setting **name**
 and **package** of the executed module to the folder name and
 temporarily injecting the module into sys.modules.
 
@@ -194,7 +188,7 @@ Loading multiple versions of one component
 ------------------------------------------
 
 There are times when you might want to load more than one version of a
-plugin at once. why? well lets say you have a ``tool`` component that
+plugin at once. why? well lets say you have a `tool` component that
 does some function on a piece of data, what function? not important but
 if you say wanted to extend the system to also allow an number of other
 functions on that same data, perhaps some function provided by a 3d
@@ -213,9 +207,9 @@ spesfic version from one plugin, bypassing the default from the system.
 Tracking loaded Components
 --------------------------
 
-Pyitect tracks used components at anytime ``System.useing`` can be
+Pyitect tracks used components at anytime `System.useing` can be
 inspected to find all components that have been requested and from what
-plugins they have been loaded along with versions ``System.useing`` is
+plugins they have been loaded along with versions `System.useing` is
 laying out as a multilayer dictionary with arrays of loaded versions,
 here is an example where more than one version of a component is active
 
@@ -236,8 +230,8 @@ Events
 ------
 
 The plugin system also includes a simple event system bount to the
-``System`` object, it simply allows one to register a function to an
-event name and when ``System.fire_event`` is called it calls all
+`System` object, it simply allows one to register a function to an
+event name and when `System.fire_event` is called it calls all
 registered functions passing the extra args and kwargs to them
 
 pyitect fires some event internally so that you can keep track of when
@@ -333,10 +327,10 @@ if however we did this
     }
 
 then a special version would be added to the system, version
-``0.0.1-bar_type_1``, and when you required that version when loading
-the ``Bar`` component it would load the name ``bar1`` from the module
-loaded from the ``Im-A-Plugin`` plugin. More than one mapping can be
-provided by separating them with the pipe ``|`` character in this way
+`0.0.1-bar_type_1`, and when you required that version when loading
+the `Bar` component it would load the name `bar1` from the module
+loaded from the `Im-A-Plugin` plugin. More than one mapping can be
+provided by separating them with the pipe `|` character in this way
 more than one version can be provided. example:
 
 ::
@@ -377,18 +371,18 @@ name to acces the component under
         }
     }
 
-notice that the version post-fix can be left out, as long as the ``=``
-is there the capitalized name ``FooBar`` can be accessed via the
-lowercase name ``foobar`` but will still have the normal ``0.0.1``
+notice that the version post-fix can be left out, as long as the `=`
+is there the capitalized name `FooBar` can be accessed via the
+lowercase name `foobar` but will still have the normal `0.0.1`
 version
 
-the second one ``BARFOO`` wil create a ``0.0.1-barfootype`` version.
+the second one `BARFOO` wil create a `0.0.1-barfootype` version.
 
 Iterating over available plugin versions
 ----------------------------------------
 
 Pyitect provides an iterator function to iterate over available
-providers for a component ``System.ittrPluginsByComponent``
+providers for a component `System.ittrPluginsByComponent`
 
 this function will loop over all plugin that provided the component and
 return a tulple of the plugin name and it's highest available version.
