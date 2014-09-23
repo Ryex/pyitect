@@ -1,5 +1,7 @@
+=======
 Pyitect
 =======
+
 
 A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3
@@ -7,8 +9,10 @@ framework for Python 3
 .. contents:: Table of Contents
    :depth: 2
 
+*****************
 What is a Plugin?
------------------
+*****************
+
 
 a plugin to pyitect is simply a folder with a .json file of the same
 name inside
@@ -54,8 +58,9 @@ useless would it not? not providing components and all?
 -  **consumes** -> a mapping of needed component names to version strings, empty string = no requirement
 -  **provides** -> a mapping of provided component names to prefix mappings 
 
+********************
 Version Requierments
---------------------
+********************
 
 a plugin can provide version requirements for the components it's
 importing
@@ -100,8 +105,10 @@ setuptools works here
 
 learn more from the `parse\_version docs <https://pythonhosted.org/setuptools/pkg_resources.html#id33>`_
 
+******************************************
 Letting plugins access consumed Components
-------------------------------------------
+******************************************
+
 
 inside your plugin files you need to get access to your consumed
 components right? here's how you do it
@@ -115,8 +122,10 @@ components right? here's how you do it
         def __init__():
             foo("it's a good day to be a plugin")
 
+**************************
 Setting up a Plugin system
---------------------------
+**************************
+
 
 Here's how you set up a plugin system
 
@@ -139,11 +148,19 @@ The general idea is to create a system, search some path or paths for plugins an
 you can of course filter `System.plugins` in some way before passing it to `System.enable_plugins`
 
 Enable Plugins
-~~~~~~~~~~~~~~
+==============
+
 
 `System.enable_plugins()` accepts either a single `Plugin` object, a mapping object (ie a dict) where each key maps to a `Plugin` object, or an iterable (ie a list) of `Plugin` objects
 
 Plugin components are not made available to the system until they are enabled.
+
+Loading Plugins
+===============
+Plugins are loaded on demand when a component is loaded via
+::
+
+    System.load("<component name>")
 
 Plugin Loading Modes
 --------------------
@@ -153,7 +170,8 @@ Plugins can be loaded in two different modes `import` and
 any other optional
 
 import mode
-~~~~~~~~~~~
+^^^^^^^^^^^
+
 
 `import` mode requires, and is the default on, Python version 3.4 or
 higher. It uses the newly improved import lib to load the file pointed
@@ -163,7 +181,8 @@ python module in `.pyd` or `.so` form, a `.pyc` or `.pyo`
 compiled source file, or just a plain old `.py` source file.
 
 exec mode
-~~~~~~~~~
+^^^^^^^^^
+
 
 loads plugins by compiling the provided source file into a code object
 and executing the code object inside a blank Module object. This
@@ -185,7 +204,8 @@ by keeping clean namespaces but this is no substitute for good security
 only load know plugins.
 
 Loading multiple versions of one component
-------------------------------------------
+==========================================
+
 
 There are times when you might want to load more than one version of a
 plugin at once. why? well lets say you have a `tool` component that
@@ -202,10 +222,11 @@ different versions and then load them all.
     System.load(component, requirements={'component': 'plugin:version'})
 
 in this case the requirements for the component can be set to load a
-spesfic version from one plugin, bypassing the default from the system.
+spesfic versi
+--------------------------on from one plugin, bypassing the default from the system.
 
 Tracking loaded Components
---------------------------
+==========================
 
 Pyitect tracks used components at anytime `System.useing` can be
 inspected to find all components that have been requested and from what
@@ -226,66 +247,10 @@ here is an example where more than one version of a component is active
         }
     }
 
-Events
-------
-
-The plugin system also includes a simple event system bount to the
-`System` object, it simply allows one to register a function to an
-event name and when `System.fire_event` is called it calls all
-registered functions passing the extra args and kwargs to them
-
-pyitect fires some event internally so that you can keep track of when
-the system finds and loads plugins
-
-plugin\_found
-~~~~~~~~~~~~~
-
-a function bound to this event gets called every time a plugin is found
-during a search called an example is provided:
-
-::
-
-    def onPluginFound (path, plugin):
-        """
-        path : the full path to the folder containing the plugin
-        plugin : plugin version string (ie 'plugin_name:version')
-        """
-        print("plugin `%s` found at `%s`" % (plugin, path))
-
-plugin\_loaded
-~~~~~~~~~~~~~~
-
-a function bound to this event is called every time a new plugin is
-loaded during a component load example:
-
-::
-
-    def onPluginLoad (plugin, plugin_required, component_needed):
-        """
-        plugin : plugin version string (ie 'plugin_name:version')
-        plugin_required: version string of the plugin that required the loaded plugin (version string ie 'plugin_name:version') (might be None)
-        component_needed: the name of the component needed by the requesting plugin
-        """
-        print("plugin `%s` was loaded by plugin `%s` during a request for the `%s` component" % (plugin, plugin_required, component_needed))
-
-component\_loaded
-~~~~~~~~~~~~~~~~~
-
-a function bound to this event is called every time a component is
-sucessfuly loaded example:
-
-::
-
-    def onComponentLoad (component, plugin_required, plugin_loaded):
-        """
-        component : the name of the component loaded
-        plugin_required : version string of the plugin that required the loaded component (version string ie 'plugin_name:version') (might be None)
-        plugin_loaded : version string of the plugin that the component was loaded from (version string ie 'plugin_name:version')
-        """
-        print("Component `%s` loaded, required by `%s`, loaded from `%s`" % (component, plugin_required, plugin_loaded) )
 
 Providing multiple versions of a component from the same plugin
----------------------------------------------------------------
+===============================================================
+
 
 what if you want to provide multiple versions of a component from the
 same plugin? if you have a system like in the Loading multiple versions
@@ -346,6 +311,7 @@ more than one version can be provided. example:
     }
 
 creating versions mappings
+--------------------------
 
 ::
 
@@ -378,8 +344,108 @@ version
 
 the second one `BARFOO` wil create a `0.0.1-barfootype` version.
 
+******
+Events
+******
+
+The plugin system also includes a simple event system bount to the
+`System` object, it simply allows one to register a function to an
+event name and when `System.fire_event` is called it calls all
+registered functions passing the extra args and kwargs to them
+
+pyitect fires some event internally so that you can keep track of when
+the system finds and loads plugins
+
+Using Events
+============
+
+Pyitect supplies three methods for dealing with events
+
+System.bind_event
+-----------------
+::
+
+    System.bind_event('name', Function)
+
+binds `Function` to the event `'name'`. when an event of `'name'` is fired 
+the function will be called wall all extra parameters passed to the `fire_event` call.
+
+System.unbind_event
+-------------------
+::
+
+    System.unbind_event('name', Function)
+
+removes `Function` form the list of functions to be called when the event is fired
+
+System.fire_event
+-----------------
+::
+
+    System.fire_event('name', *args, **kwargs)
+
+fires the event `'name'`, calling all bound functions with `*args` and `**kwargs`
+
+Events Fired Internaly
+======================
+
+
+plugin\_found
+-------------
+
+
+
+a function bound to this event gets called every time a plugin is found
+during a search called an example is provided:
+
+::
+
+    def onPluginFound (path, plugin):
+        """
+        path : the full path to the folder containing the plugin
+        plugin : plugin version string (ie 'plugin_name:version')
+        """
+        print("plugin `%s` found at `%s`" % (plugin, path))
+
+plugin\_loaded
+--------------
+
+
+
+a function bound to this event is called every time a new plugin is
+loaded during a component load example:
+
+::
+
+    def onPluginLoad (plugin, plugin_required, component_needed):
+        """
+        plugin : plugin version string (ie 'plugin_name:version')
+        plugin_required: version string of the plugin that required the loaded plugin (version string ie 'plugin_name:version') (might be None)
+        component_needed: the name of the component needed by the requesting plugin
+        """
+        print("plugin `%s` was loaded by plugin `%s` during a request for the `%s` component" % (plugin, plugin_required, component_needed))
+
+component\_loaded
+-----------------
+
+a function bound to this event is called every time a component is
+sucessfuly loaded example:
+
+::
+
+    def onComponentLoad (component, plugin_required, plugin_loaded):
+        """
+        component : the name of the component loaded
+        plugin_required : version string of the plugin that required the loaded component (version string ie 'plugin_name:version') (might be None)
+        plugin_loaded : version string of the plugin that the component was loaded from (version string ie 'plugin_name:version')
+        """
+        print("Component `%s` loaded, required by `%s`, loaded from `%s`" % (component, plugin_required, plugin_loaded) )
+
+
+****************************************
 Iterating over available plugin versions
-----------------------------------------
+****************************************
+
 
 Pyitect provides an iterator function to iterate over available
 providers for a component `System.ittrPluginsByComponent`
@@ -394,14 +460,18 @@ list them too.
     for plugin, version in System.ittrPluginsByComponent('component_name'):
         print("Plugin %s provides The component at version %s" % (plugin, version))
 
+********
 Examples
---------
+********
+
 
 For more information checkout the tests directory, it should be a fairly
 straight forward explanation form there.
 
+*******
 LICENSE
--------
+*******
+
 
 Copyright (c) 2014, Benjamin "Ryex" Powers ryexander@gmail.com
 
