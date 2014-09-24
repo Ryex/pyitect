@@ -189,15 +189,15 @@ class System(object):
         """
         remove a function from the event
         """
-        if name in self.events:
-            self.events[name].remove(function)
+        if event in self.events:
+            self.events[event].remove(function)
 
-    def fire_event(self, name, *args, **kwargs):
+    def fire_event(self, event, *args, **kwargs):
         """
         fire all functions bound to the event name and pass all  extra args and kwargs to the function
         """
-        if name in self.events:
-            for function in self.events[name]:
+        if event in self.events:
+            for function in self.events[event]:
                 function(*args, **kwargs)
 
     def _map_component(self, component, plugin, version):
