@@ -38,10 +38,10 @@ system.bind_event('plugin_found', onPluginFound)
 system.bind_event('pluign_loaded', onPluginLoad)
 system.bind_event('component_loaded', onComponentLoad)
 
-print("\nSearching Plugin Path \n")
+print("\nSearching Plugin Path")
 system.search(os.path.join(folder_path, "plugins"))
 
-print("\nFiter out dead plugin before enableing plugins\n")
+print("\nFiter out dead plugin before enableing plugins")
 plugins_filter = ["dead_plugin"]
 # get all plugin configs that arn't named dead_plugin
 # collect plugins[<name>][<version_str>] for all names n in plugins for all versions v in plugins[n] if name not in filter
@@ -49,39 +49,40 @@ plugins = [system.plugins[n][v] for n in system.plugins for v in system.plugins[
 
 print(plugins)
 
+print("\nEnableing plugins")
 system.enable_plugins(plugins)
 
-print("\nLoading `bar` component \n")
+print("\nLoading `bar` component")
 bar = system.load("bar")
 bar()
 
-print("\nIterating component providers \n")
+print("\nIterating component providers")
 for plugin, version in system.ittrPluginsByComponent("test"):
     print("Plugin `%s` provides The component at version `%s`" % (plugin, version))
     version_string = plugin + ":" + version
     print(version_string)
     reqs = { "test" : version_string }
     test = system.load("test", reqs)
-    print("\ncalling test\n")
+    print("\ncalling test")
     test()
     print("\n")
 
-print("\nImporting plugin via 'exec' \n")
+print("\nImporting plugin via 'exec'")
 Exec_Foo_Echo = system.load("Exec_Foo_Echo")
 Exec_Foo_Echo("I am being echoed back by a plugin loaded via exec")
 
 Exec_Foo_Echo_Relative = system.load("Exec_Foo_Echo_Relative")
 Exec_Foo_Echo_Relative("This text should be printed by a absolute import method")
 
-print("\nImporting relative import test plugin\n")
+print("\nImporting relative import test plugin")
 TestClass = system.load("TestClass")
 t = TestClass("relative imports were a success")
 t.hello()
 
-print("\nAttempt to import dead plugin\n")
+print("\nAttempt to import dead plugin")
 
 try:
     foobarbar = system.load("foobarbar")
     foobarbar()
 except RuntimeError as err:
-    print("\ndead_plugin failed to load, this is intended\n")
+    print("\ndead_plugin failed to load, this is intended")

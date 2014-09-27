@@ -50,12 +50,12 @@ class Plugin(object):
         if 'consumes' in config and isinstance(config['consumes'], collections.Mapping):
             self.consumes = config['consumes']
         else:
-            raise RuntimeError("Plugin at '%s'does not have a mapping of consumed components to plugin versions" % path)
+            raise RuntimeError("Plugin at '%s' does not have a mapping of consumed components to plugin versions" % path)
         if 'provides' in config and isinstance(config['provides'], collections.Mapping):
             self.provides = config['provides']
         else:
             raise RuntimeError("Plugin at '%s' does not have a mapping of provided components to version postfixes" % path)
-        if ('mode' in config and (config['mode'].lower() == 'import' or config['mode'] == 'exec' )):
+        if 'mode' in config and (config['mode'].lower() == 'import' or config['mode'] == 'exec' ):
             self.mode = config['mode']
             if self.mode == 'import' and not Plugin.supports_import_mode():
                 self.mode = 'exec'
@@ -64,6 +64,13 @@ class Plugin(object):
             self.mode = 'import' if Plugin.supports_import_mode() else 'exec'
         else:
             raise RuntimeError("Plugin at '%s' has bad mode, 'import' and 'exec' allowed" % path)
+        if 'on_enable' in config:
+            if isinstance(config['on_enable'], str):
+                self.on_enable = config['on_enable']
+            else:
+                raise RuntimeError("Plugin at '%s' has a 'on_enable' that is not a string" % path)
+        else:
+            self.on_enable = None
         self.path = path
 
     @staticmethod
@@ -126,6 +133,19 @@ class Plugin(object):
     def get_version_string(self):
         """returns a version stirng"""
         return self.name + ":" + self.version[0]
+
+    def run_on_enable(self):
+        """runs the file in the 'on_enable' setting if set"""
+        if self.on_enable:
+            try:
+                filepath = os.path.join(self.path, self.on_enable)
+                sys.path.insert(0, self.path)
+                with open(filepath) as f:
+                    code = compile(f.read(), self.on_enable, 'exec')
+                    exec(code, {})
+                sys.path.remove(self.path)
+            except Exception as err:
+                raise RuntimeError("Plugin '%s' at '%s' had an error during it's 'on_enable'" % (self.name, self.path)) from err
 
     def __str__(self):
         return "Plugin %s:%s" % (self.name, self.version[0], self.path)
@@ -254,6 +274,8 @@ class System(object):
                     self._map_component(component, plugin_cfg.name, map_postfix(pair))
             else:
                 self._map_component(component, plugin_cfg.name, plugin_cfg.version)
+
+        plugin_cfg.run_on_enable()
 
     def enable_plugins(self, plugins):
         """

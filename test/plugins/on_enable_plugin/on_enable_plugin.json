@@ -1,0 +1,14 @@
+{
+    "name": "on_enable_plugin",
+    "author": "Ryex",
+    "version": "0.0.1",
+    "file": "plugin.py",
+    "on_enable": "dostuff.py",
+    "consumes": {
+
+    },
+    "provides": {
+        "Exec_Foo_Echo" : "",
+        "Exec_Foo_Echo_Relative": ""
+    }
+}

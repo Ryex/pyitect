@@ -40,8 +40,9 @@ useless would it not? not providing components and all?
         "name": "Im-A-Plugin",
         "author": "Ryex",
         "version": "0.0.1",
-        "file" : "file.py",
-        "mode" : "import" // optional either 'import' or 'exec'
+        "file": "file.py",
+        "mode": "import", // optional either 'import' or 'exec'
+        "on_enable": "dostuff.py", // optional, runs this file when the plugin is enabled
         "consumes": {
             "foo" : ""
         },
@@ -151,9 +152,19 @@ Enable Plugins
 ==============
 
 
-`System.enable_plugins()` accepts either a single `Plugin` object, a mapping object (ie a dict) where each key maps to a `Plugin` object, or an iterable (ie a list) of `Plugin` objects
+`System.enable_plugins()` accepts either a single `Plugin` object, a mapping object 
+where each key maps to a `Plugin` object, or an iterable (ie a list) of `Plugin` objects
 
 Plugin components are not made available to the system until they are enabled.
+
+'on_enable' Property
+---------------------
+
+plugins can specify an `on_enable` property in this configuration. This file is exacuted 
+right after a plugin is enabled and it's components have been mapped. 
+this allows for special cases where enabling a plugin requires more than just makeing it's components avalible to be imported.
+for example is there is some system set up to be done.
+    
 
 Loading Plugins
 ===============
