@@ -307,11 +307,11 @@ class System(object):
         """
         cfgpath = os.path.join(path, os.path.basename(path) + ".json")
         if os.path.exists(cfgpath):
-            cfgfile = open(cfgpath)
-            try:
-                cfg = json.load(cfgfile)
-            except Exception as err:
-                raise RuntimeError("Could not parse plugin json file at '%s'" % path) from err
+            with open(cfgpath) as cfgfile:
+                try:
+                    cfg = json.load(cfgfile)
+                except Exception as err:
+                    raise RuntimeError("Could not parse plugin json file at '%s'" % path) from err
 
             if 'name' in cfg:
                 # ensure we have a place to map the version to the config
