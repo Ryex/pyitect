@@ -7,4 +7,4 @@ class TestClass(object):
         self.message = message
 
     def hello(self):
-        print("\n", self.message, "\n")
+        print(self.message)

@@ -168,10 +168,20 @@ for example is there is some system set up to be done.
 
 Loading Plugins
 ===============
+
 Plugins are loaded on demand when a component is loaded via
+
 ::
 
     System.load("<component name>")
+    
+a plugin can also be explicitly loaded via
+
+::
+
+    System.load_plugin(plugin, version)
+    
+where `plugin` is the plugin name and `version` is the version
 
 Plugin Loading Modes
 --------------------
@@ -213,6 +223,22 @@ temporarily injecting the module into sys.modules.
 Pyitect does it's best to isolate plugins from the rest of the program
 by keeping clean namespaces but this is no substitute for good security
 only load know plugins.
+
+
+get_plugin_module
+------------------
+
+Loaded pluginss do NOT store their module object in `sys.modules` 
+instead they are stored internally at `System.loaded_plugins` (a mapping of plugin names and version strings to module objects)
+Normaly you would only access a plugin's components but the module obejct can be accessed explicitly with
+
+::
+
+    System.get_plugin_module(plugin [, version=version_stirng])
+    
+if no version is given it fetches the highest version avalible.
+
+a plugin must allready be loaded (not just enabled) to fetch it's module obejct
 
 Loading multiple versions of one component
 ==========================================

@@ -9,10 +9,6 @@ from pkg_resources import parse_version
 import operator
 
 
-
-
-
-
 class Plugin(object):
     """
     an object that can hold the metadata for a plugin, like its name, author, verison, and the file to be loaded ect.
@@ -568,7 +564,7 @@ class System(object):
             self.loaded_components[component][plugin] = {}
         if not version in self.loaded_components[component][plugin]:
 
-            plugin_obj = self._load_plugin(plugin, version, requesting=requesting, component=component)
+            plugin_obj = self.load_plugin(plugin, version, requesting=requesting, component=component)
 
             access_name = component
             if plugin in self.postfix_mappings and component in self.postfix_mappings[plugin] and version in self.postfix_mappings[plugin][component]:
@@ -591,7 +587,7 @@ class System(object):
         component_obj = self.loaded_components[component][plugin][version]
         return component_obj
 
-    def _load_plugin(self, plugin, version, requesting=None, component=None):
+    def load_plugin(self, plugin, version, requesting=None, component=None):
         #we dont want to load a plugin twice just becasue it provides more than one component, save previouly loaded plugins
         if not plugin in self.loaded_plugins:
             self.loaded_plugins[plugin] = {}
@@ -645,3 +641,15 @@ class System(object):
         component = self._load_component(component, plugin, version)
 
         return component
+        
+    def get_plugin_module(self, plugin, version=None):
+        if plugin in self.loaded_plugins:
+            if not version:
+                version = sorted(self.loaded_plugins[plugin].keys(), reverse=True)[0]
+            if version in self.loaded_plugins[plugin]:
+                return self.loaded_plugins[plugin][version]
+            else:
+                raise RuntimeError("Version '%s' of plugin '%s' not yet loaded" % (version, plugin))
+        else:
+            raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
+            

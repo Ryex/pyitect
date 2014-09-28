@@ -1,5 +1,6 @@
 import os
 import sys
+from pprint import pprint
 folder_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(folder_path))
 
@@ -47,7 +48,7 @@ plugins_filter = ["dead_plugin"]
 # collect plugins[<name>][<version_str>] for all names n in plugins for all versions v in plugins[n] if name not in filter
 plugins = [system.plugins[n][v] for n in system.plugins for v in system.plugins[n] if n not in plugins_filter]
 
-print(plugins)
+pprint(plugins)
 
 print("\nEnableing plugins")
 system.enable_plugins(plugins)
@@ -86,3 +87,9 @@ try:
     foobarbar()
 except RuntimeError as err:
     print("\ndead_plugin failed to load, this is intended")
+    
+print("\nTest fetching plugin module")
+
+module = system.get_plugin_module("test_plugin")
+
+pprint(module.__dict__)
