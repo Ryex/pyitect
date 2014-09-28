@@ -7,7 +7,6 @@ A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3
 
 .. contents:: Table of Contents
-   :depth: 2
 
 *****************
 What is a Plugin?
@@ -57,7 +56,7 @@ useless would it not? not providing components and all?
 -  **file** -> a path to the file that when imported will provide a module who's namespace contains all provided plugins
 -  **mode** -> (OPTIONAL) defaults to `import` on python 3.4 and up `ecec` otherwise: sets the import mode
 -  **consumes** -> a mapping of needed component names to version strings, empty string = no requirement
--  **provides** -> a mapping of provided component names to prefix mappings 
+-  **provides** -> a mapping of provided component names to prefix mappings
 
 ********************
 Version Requierments
@@ -152,7 +151,7 @@ Enable Plugins
 ==============
 
 
-`System.enable_plugins()` accepts either a single `Plugin` object, a mapping object 
+`System.enable_plugins()` accepts either a single `Plugin` object, a mapping object
 where each key maps to a `Plugin` object, or an iterable (ie a list) of `Plugin` objects
 
 Plugin components are not made available to the system until they are enabled.
@@ -160,11 +159,11 @@ Plugin components are not made available to the system until they are enabled.
 'on_enable' Property
 ---------------------
 
-plugins can specify an `on_enable` property in this configuration. This file is exacuted 
-right after a plugin is enabled and it's components have been mapped. 
+plugins can specify an `on_enable` property in this configuration. This file is exacuted
+right after a plugin is enabled and it's components have been mapped.
 this allows for special cases where enabling a plugin requires more than just makeing it's components avalible to be imported.
 for example is there is some system set up to be done.
-    
+
 
 Loading Plugins
 ===============
@@ -174,13 +173,13 @@ Plugins are loaded on demand when a component is loaded via
 ::
 
     System.load("<component name>")
-    
+
 a plugin can also be explicitly loaded via
 
 ::
 
     System.load_plugin(plugin, version)
-    
+
 where `plugin` is the plugin name and `version` is the version
 
 Plugin Loading Modes
@@ -228,14 +227,14 @@ only load know plugins.
 get_plugin_module
 ------------------
 
-Loaded pluginss do NOT store their module object in `sys.modules` 
+Loaded pluginss do NOT store their module object in `sys.modules`
 instead they are stored internally at `System.loaded_plugins` (a mapping of plugin names and version strings to module objects)
 Normaly you would only access a plugin's components but the module obejct can be accessed explicitly with
 
 ::
 
     System.get_plugin_module(plugin [, version=version_stirng])
-    
+
 if no version is given it fetches the highest version avalible.
 
 a plugin must allready be loaded (not just enabled) to fetch it's module obejct
@@ -404,7 +403,7 @@ System.bind_event
 
     System.bind_event('name', Function)
 
-binds `Function` to the event `'name'`. when an event of `'name'` is fired 
+binds `Function` to the event `'name'`. when an event of `'name'` is fired
 the function will be called wall all extra parameters passed to the `fire_event` call.
 
 System.unbind_event
@@ -431,7 +430,6 @@ plugin\_found
 -------------
 
 
-
 a function bound to this event gets called every time a plugin is found
 during a search called an example is provided:
 
@@ -443,6 +441,22 @@ during a search called an example is provided:
         plugin : plugin version string (ie 'plugin_name:version')
         """
         print("plugin `%s` found at `%s`" % (plugin, path))
+
+
+component\_mapped
+------------------
+
+when a plugin is enabled it's components are mapped out, this event is fired ever time that happens
+
+::
+
+    def onComponentMapped (component, plugin, version):
+        """
+        component : the component name
+        plugin : plugin name
+        version : the plugin version string less the plugin name
+        """
+        print("component `%s` mapped form `%s@%s`" % (component, plugin, version))
 
 plugin\_loaded
 --------------

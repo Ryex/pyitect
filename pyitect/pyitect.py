@@ -106,7 +106,7 @@ class Plugin(object):
                 plugin.__package__ = None
             sys.path.insert(0, self.path)
             with open(filepath) as f:
-                code = compile(f.read(), self.file, 'exec')
+                code = compile(f.read(), filepath, 'exec')
                 exec(code, plugin.__dict__)
             sys.path.remove(self.path)
             if package:
@@ -137,7 +137,7 @@ class Plugin(object):
                 filepath = os.path.join(self.path, self.on_enable)
                 sys.path.insert(0, self.path)
                 with open(filepath) as f:
-                    code = compile(f.read(), self.on_enable, 'exec')
+                    code = compile(f.read(), filepath, 'exec')
                     exec(code, {})
                 sys.path.remove(self.path)
             except Exception as err:
@@ -224,6 +224,7 @@ class System(object):
             self.components[component][plugin].append(version)
         else:
             self.components[component][plugin] = [version, ]
+        self.fire_event('component_mapped', component, plugin, version)
 
     def _map_components(self, plugin_cfg):
         """
@@ -240,8 +241,9 @@ class System(object):
                 postfix, mapped_name = arr
                 postfix = postfix.strip()
                 mapped_name = mapped_name.strip()
-
-                version = plugin_cfg.version[0] + "-" + postfix
+                version = plugin_cfg.version[0]
+                if postfix:
+                    version += '-' + postfix
 
                 if not plugin_cfg.name in self.postfix_mappings:
                     self.postfix_mappings[plugin_cfg.name] = {}
@@ -252,7 +254,6 @@ class System(object):
                 if not plugin_cfg.name in self.plugins:
                     self.plugins[plugin_cfg.name] = {}
                 self.plugins[plugin_cfg.name][version] = plugin_cfg
-
 
                 return version
 
@@ -315,8 +316,11 @@ class System(object):
                     self.plugins[cfg['name']] = {}
                 # map the name and vserion to the config, use only the version string not the full tuple
                 plugin = Plugin(cfg, path)
-                self.plugins[cfg['name']][cfg['version']] = plugin
-                self.fire_event('plugin_found', path, plugin.get_version_string())
+                if not self.plugins[cfg['name']] or not self.plugins[cfg['name']][cfg['version']]:
+                    self.plugins[cfg['name']][cfg['version']] = plugin
+                    self.fire_event('plugin_found', path, plugin.get_version_string())
+                else:
+                    raise RuntimeError("Duplicate plugin name at '%s'" % path)
             else:
                 raise RuntimeError("Plugin at %s has no name" % path)
         else:
@@ -598,8 +602,11 @@ class System(object):
             plugin_cfg = self.plugins[plugin][version]
 
             for component_req in plugin_cfg.consumes.keys():
-                setattr(consumes, component_req, self.load(component_req, plugin_cfg.consumes, requesting=plugin_cfg.get_version_string()))
-
+                try:
+                    setattr(consumes, component_req, self.load(component_req, plugin_cfg.consumes, requesting=plugin_cfg.get_version_string()))
+                except Exception as err:
+                    raise RuntimeError("Could not load required component '%s' for plugin '%s@%s'" % (component_req, plugin, version)) from err
+            
             sys.modules["PyitectConsumes"] = consumes
             self.loaded_plugins[plugin][version] = plugin_cfg.load()
             del sys.modules["PyitectConsumes"]
