@@ -98,12 +98,10 @@ here are some examples
     "FooPlugin:1.0 || 2.5.1" // either 1.0.x or 2.5.1
     "FooPlugin:1.0 || 2.3.3 - 3.1.0 || >=4.3 <5.2.6-pre25" // get real complicated, cause you know, you might need it.
 
-pyitect uses `parse_version` from the `pkg_resources` module (part
-of setuptools) to turn version strings into tuples that are then
-compared lexagraphicaly so any version string system that works with
-setuptools works here
+pyitect uses `LooseVersion` class from the `version` module of `distutils` 
+to parse versions
 
-learn more from the `parse\_version docs <https://pythonhosted.org/setuptools/pkg_resources.html#id33>`_
+learn more from the `documentation <http://pydoc.org/2.5.1/distutils.version.html#LooseVersion>`_
 
 ******************************************
 Letting plugins access consumed Components

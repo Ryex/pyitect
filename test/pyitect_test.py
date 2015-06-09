@@ -2,7 +2,7 @@ import os
 import sys
 from pprint import pprint
 folder_path = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(folder_path))
+sys.path.insert(0, os.path.dirname(folder_path))
 
 def onPluginFound (path, plugin):
     """
@@ -31,6 +31,9 @@ def onComponentLoad (component, plugin_required, plugin_loaded):
 
 import pyitect
 import json
+
+pprint(pyitect.__spec__)
+
 cfgfile = open(os.path.join(folder_path, "config.json"))
 cfg = json.load(cfgfile)
 system = pyitect.System(cfg)
