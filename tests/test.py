@@ -1,7 +1,6 @@
 import os
 import json
 import inspect
-from pprint import pprint
 from nose import tools
 
 import pyitect
@@ -17,7 +16,6 @@ componentLoadTriggered = None
 def setup():
     # setup a plugin system
     global system
-    pprint(pyitect.__spec__)
 
     cfgfile = open(os.path.join(folder_path, "config.json"))
     cfg = json.load(cfgfile)

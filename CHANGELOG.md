@@ -1,7 +1,12 @@
+v1.0.1
+------
+* change out Version mechanisem for a local parse methos bassed off of LooseVersion
+* update tests to proper unit tests
+
 v1.0.0
 ------
 * change from parse_version from setuptools to LooseVersion in distutils
- 
+
 v0.9.2
 ------
 * Ensure plugin configuration json file is closed @svisser
