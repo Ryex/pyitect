@@ -4,8 +4,8 @@ import sys
 import os
 import types
 import collections
+import re
 import warnings
-from distutils.version import LooseVersion as Version
 import operator
 
 
@@ -45,7 +45,9 @@ class Plugin(object):
             # store both the original version string and a parsed version that
             # can be compaired accurately
             self.version = (
-                config['version'].strip(), Version(config['version'].strip()))
+                config['version'].strip(),
+                parse_version(config['version'].strip())
+            )
         else:
             raise RuntimeError("Plugin at '%s' does not have a version" % path)
         if 'file' in config:
@@ -215,7 +217,11 @@ class System(object):
         plugin_loaded : version string of the plugin that the component was
             loaded from (version string ie 'plugin_name:version')
 
+    Pyitect keeps track of all the instances of the System class in
+    `System.systems` which is a map of object is's to instances of System.
+
     """
+    systems = {}
 
     def __init__(self, config):
         """
@@ -236,8 +242,10 @@ class System(object):
         self.postfix_mappings = {}
         self.loaded_components = {}
         self.loaded_plugins = {}
+        self.enabled_plugins = {}
         self.useing = {}
         self.events = {}
+        System.systems[id(self)] = self
 
     def bind_event(self, event, function):
         """
@@ -270,7 +278,7 @@ class System(object):
         # either add the version or create a new array with the version and
         # save it
         if isinstance(version, str):
-            version = (version, Version(version))
+            version = (version, parse_version(version))
         if plugin in self.components[component]:
             self.components[component][plugin].append(version)
         else:
@@ -284,6 +292,11 @@ class System(object):
         """
         # loop through and map component names to a listing of plugin names and
         # versions
+        if plugin_cfg.name not in self.enabled_plugins:
+            self.enabled_plugins[plugin_cfg.name] = {}
+
+        # store that the plugin is enabeled
+        self.enabled_plugins[plugin_cfg.name][plugin_cfg.version] = plugin_cfg
 
         for component, mapping in plugin_cfg.provides.items():
 
@@ -596,8 +609,8 @@ class System(object):
 
             # now we parse the high and low versions to make them compairable
             # and find a suitable version
-            highv = (highv[0], Version(highv[0]), highv[1])
-            lowv = (lowv[0], Version(lowv[0]), lowv[1])
+            highv = (highv[0], parse_version(highv[0]), highv[1])
+            lowv = (lowv[0], parse_version(lowv[0]), lowv[1])
 
             # sorted from highest to lowest
             sorted_versions = sorted(
@@ -760,7 +773,7 @@ class System(object):
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
 
-    def load(self, component, requirements=None, requesting=None, bypass=False):
+    def load(self, component, requires=None, requesting=None, bypass=False):
         """
         processes loading and returns the component by name,
         chain loading any required plugins to obtain dependencies.
@@ -782,8 +795,8 @@ class System(object):
 
         if not bypass:
             reqs.update(self.config)
-        if requirements is not None:
-            reqs.update(requirements)
+        if requires is not None:
+            reqs.update(requires)
 
         # update the plugin and version requirements if they exist
         if component in reqs:
@@ -816,3 +829,18 @@ class System(object):
                     % (version, plugin))
         else:
             raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
+
+
+def parse_version(version_str):
+    component_re = re.compile(r'(\d+ | [a-z]+ | \.)', re.VERBOSE)
+    components = [
+        x
+        for x in component_re.split(version_str)
+        if x and x != '.'
+    ]
+    for i, obj in enumerate(components):
+        try:
+            components[i] = int(obj)
+        except ValueError:
+            pass
+    return tuple(components)

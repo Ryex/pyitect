@@ -5,17 +5,18 @@ import os
 local_file = lambda *f: \
     open(os.path.join(os.path.dirname(__file__), *f)).read()
 
+
 setup(
     name="pyitect",
     version="1.0.0",
-    packages=find_packages(exclude=['*test*']),
+    packages=find_packages(),
     install_requires=["setuptools >= 1.0"],
     include_package_data=True,
     # metadata for upload to PyPI
     author="Ryexander",
     author_email="Ryexander@gmail.com",
     description=(
-        "A Simple system for structuring a modeler project "
+        "A simple system for structuring a modeler project "
         "architecture via plugin like modules, uses the new "
         "importlib abilities first avalible in python 3.4, "
         "includes an exec load mode for support of python 3.0+"),
@@ -24,7 +25,9 @@ setup(
     keywords="architect project modeler plugin",
     url="https://github.com/Ryex/pyitect",
     tests_require=[
+        "nose"
     ],
+    test_suite='nose.collector',
 
     classifiers=[
         "Development Status :: 4 - Beta",
