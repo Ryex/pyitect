@@ -2,6 +2,7 @@
 Pyitect
 =======
 
+.. image:: https://travis-ci.org/Ryex/pyitect.svg
 
 A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3
@@ -98,8 +99,9 @@ here are some examples
     "FooPlugin:1.0 || 2.5.1" // either 1.0.x or 2.5.1
     "FooPlugin:1.0 || 2.3.3 - 3.1.0 || >=4.3 <5.2.6-pre25" // get real complicated, cause you know, you might need it.
 
-pyitect uses `LooseVersion` class from the `version` module of `distutils` 
-to parse versions
+pyitect uses a reimplamtation of the `LooseVersion` class's parse method (from the `version` module of `distutils`) 
+to parse versions. basicaly component of the version string are seperated out, int casting is atempted, 
+and the components are then placeds in a tulple
 
 learn more from the `documentation <http://pydoc.org/2.5.1/distutils.version.html#LooseVersion>`_
 
@@ -278,6 +280,19 @@ here is an example where more than one version of a component is active
         'special_component1' : {
             'special_plugin1': ['0.1.3'],
             'special_plugin2': ['0.2.4', '1.0.1-pre3']
+        }
+    }
+
+
+Pyitect also tracks enabeled plugins `System.enabeled_plugins` is a mapping of plugin names to a mapping of 
+versions to `Plugin` objects. Like so
+
+::
+    
+    >> System.enabeled_plugins
+    {
+        'special_plugin1' : {
+            (0, 1, 3): Plugin<special_plugin1>
         }
     }
 
