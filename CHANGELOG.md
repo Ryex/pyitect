@@ -1,6 +1,12 @@
+v1.1.0
+------
+* readme cleanup
+* gen_version generates a version 2 tuple
+* change on_enable to a callable path in the imported plugin module
+
 v1.0.1
 ------
-* change out Version mechanisem for a local parse methos bassed off of LooseVersion
+* change out Version mechanism for a local parse method based off of LooseVersion
 * update tests to proper unit tests
 
 v1.0.0
@@ -14,7 +20,7 @@ v0.9.2
 v0.9.1
 ------
 * files loaded with `exec` give proper file path 
-* proper trace back given when compoent fail to load (even when it's a recursion error) 
+* proper trace back given when component fail to load (even when it's a recursion error) 
 * add `component_mapped` event
 
 v0.9.0
@@ -23,7 +29,7 @@ v0.9.0
 
 v0.8.0
 ------
-* Added ability to run code when a plugin is enabeled via `"on_enable"` property
+* Added ability to run code when a plugin is enabled via `"on_enable"` property
 
 v0.7.2
 ------
@@ -37,18 +43,18 @@ v0.7.0
 
 v0.6.2
 ------
-* realative imports now work so long as the target file for loading is named `__init__.py` to triger python to treat the plugin folder as a package
+* relative imports now work so long as the target file for loading is named `__init__.py` to trigger python to treat the plugin folder as a package
 
 v0.6.1
 -----
-* refactored System.load out to make use of two smaller functions, easyer to maintain
-* added plugin loading modes, import for py3.4+ and exec for suport of prievious python version
+* re-factored System.load out to make use of two smaller functions, easyer to maintain
+* added plugin loading modes, import for py3.4+ and exec for support of previous python version
 
 v0.5.1
 -----
-* added ability to provide more than one version of a compoent in the same plugin with potfix mapping
+* added ability to provide more than one version of a component in the same plugin with potfix mapping
 * event system added, system fire events
-* made requierment overwrite system defaults, removed bypass peram
+* made requirement overwrite system defaults, removed bypass peram
 * ittrPluginsByComponent lists potfix mappings too.
 * tests updates to test all features
 * README update

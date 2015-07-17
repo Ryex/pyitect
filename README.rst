@@ -23,7 +23,7 @@ name inside
         Im-A-Plugin.json
         file.py
 
-A plugin has a name, a version, an author, a .py file, and it provides
+A plugin has a name, a version, an author, a module file, and it provides
 Components used to build your application. components are simply names
 in the module's namespace after the file is imported
 
@@ -55,12 +55,12 @@ useless would it not? not providing components and all?
 -  **author** -> the author of the plugin
 -  **version** -> a version for the plugin, a string that can be any form set up tools supports
 -  **file** -> a path to the file that when imported will provide a module who's namespace contains all provided plugins
--  **mode** -> (OPTIONAL) defaults to `import` on python 3.4 and up `ecec` otherwise: sets the import mode
+-  **mode** -> (OPTIONAL) defaults to `import` on python 3.4 and up `exec` otherwise: sets the import mode
 -  **consumes** -> a mapping of needed component names to version strings, empty string = no requirement
 -  **provides** -> a mapping of provided component names to prefix mappings
 
 ********************
-Version Requierments
+Version Requirements
 ********************
 
 a plugin can provide version requirements for the components it's
@@ -82,7 +82,7 @@ here are some examples
 ::
 
     ""  // no requirement
-    "*" // no requierment
+    "*" // no requirement
     "FooPlugin" // from this plugin and no other, but any version
     "FooPlugin:*" // from this plugin and no other, but any version
     "FooPlugin:1" // from this plugin and no other, version 1.x.x
@@ -99,11 +99,28 @@ here are some examples
     "FooPlugin:1.0 || 2.5.1" // either 1.0.x or 2.5.1
     "FooPlugin:1.0 || 2.3.3 - 3.1.0 || >=4.3 <5.2.6-pre25" // get real complicated, cause you know, you might need it.
 
-pyitect uses a reimplamtation of the `LooseVersion` class's parse method (from the `version` module of `distutils`) 
-to parse versions. basicaly component of the version string are seperated out, int casting is atempted, 
-and the components are then placeds in a tulple
+pyitect uses a reimplementation of the `LooseVersion` class's parse method (from the `version` module of `distutils`) 
+to parse versions. basically component of the version string are separated out, int casting is attempted, 
+and the components are then placed in a tulple
 
 learn more from the `documentation <http://pydoc.org/2.5.1/distutils.version.html#LooseVersion>`_
+
+the version parsing is available as a module level functions
+
+
+Pyitect.parse_version(version_str):
+-----------------------------------
+
+dumbly parses a version string into it's parts
+attempts to covert from string to integers where possible
+
+Pyitect.gen_version(version_str):
+-----------------------------------
+
+generates an internally used version tuple
+generates a 2 tuple
+preserving the original version string in the first position
+a parsed version in the second
 
 ******************************************
 Letting plugins access consumed Components
@@ -145,7 +162,9 @@ Here's how you set up a plugin system
     Bar = system.load("Bar")
 
 The general idea is to create a system, search some path or paths for plugins and then enable them
-you can of course filter `System.plugins` in some way before passing it to `System.enable_plugins`
+you can of course filter `System.plugins` in some way before passing it to `system.enable_plugins`
+
+A plugin system can not be created without first creating an instance of the System class.
 
 Enable Plugins
 ==============
@@ -159,9 +178,9 @@ Plugin components are not made available to the system until they are enabled.
 'on_enable' Property
 ---------------------
 
-plugins can specify an `on_enable` property in this configuration. This file is exacuted
+plugins can specify an `on_enable` property in this configuration. This file is executed
 right after a plugin is enabled and it's components have been mapped.
-this allows for special cases where enabling a plugin requires more than just makeing it's components avalible to be imported.
+this allows for special cases where enabling a plugin requires more than just making it's components available to be imported.
 for example is there is some system set up to be done.
 
 
@@ -172,13 +191,13 @@ Plugins are loaded on demand when a component is loaded via
 
 ::
 
-    System.load("<component name>")
+    system.load("<component name>")
 
 a plugin can also be explicitly loaded via
 
 ::
 
-    System.load_plugin(plugin, version)
+    system.load_plugin(plugin, version)
 
 where `plugin` is the plugin name and `version` is the version
 
@@ -227,17 +246,17 @@ only load know plugins.
 get_plugin_module
 ------------------
 
-Loaded pluginss do NOT store their module object in `sys.modules`
+Loaded plugins do NOT store their module object in `sys.modules`
 instead they are stored internally at `System.loaded_plugins` (a mapping of plugin names and version strings to module objects)
-Normaly you would only access a plugin's components but the module obejct can be accessed explicitly with
+Normaly you would only access a plugin's components but the module object can be accessed explicitly with
 
 ::
 
-    System.get_plugin_module(plugin [, version=version_stirng])
+    system.get_plugin_module(plugin [, version=version_stirng])
 
 if no version is given it fetches the highest version avalible.
 
-a plugin must allready be loaded (not just enabled) to fetch it's module obejct
+a plugin must all ready be loaded (not just enabled) to fetch it's module object
 
 Loading multiple versions of one component
 ==========================================
@@ -258,21 +277,20 @@ different versions and then load them all.
     System.load(component, requirements={'component': 'plugin:version'})
 
 in this case the requirements for the component can be set to load a
-spesfic versi
---------------------------on from one plugin, bypassing the default from the system.
+specific version from one plugin, bypassing the default from the system.
 
 Tracking loaded Components
 ==========================
 
-Pyitect tracks used components at anytime `System.useing` can be
+Pyitect tracks used components at anytime `System.using` can be
 inspected to find all components that have been requested and from what
-plugins they have been loaded along with versions `System.useing` is
+plugins they have been loaded along with versions `System.using` is
 laying out as a multilayer dictionary with arrays of loaded versions,
 here is an example where more than one version of a component is active
 
 ::
 
-    >> System.useing
+    >> System.using
     {
         'component1' : {
             'plugin1`: ['1.0.2']
@@ -284,7 +302,7 @@ here is an example where more than one version of a component is active
     }
 
 
-Pyitect also tracks enabeled plugins `System.enabeled_plugins` is a mapping of plugin names to a mapping of 
+Pyitect also tracks enabled plugins `System.enabeled_plugins` is a mapping of plugin names to a mapping of 
 versions to `Plugin` objects. Like so
 
 ::
@@ -393,16 +411,113 @@ version
 
 the second one `BARFOO` wil create a `0.0.1-barfootype` version.
 
+*********************************
+Usable method of the System class
+*********************************
+
+Static
+======
+
+There is only one Static class method
+
+expand_version_requierment(version)
+-----------------------------------
+
+ Takes a string of one of the following forms:
+
+::
+    "" -> no version requierment
+    "*" -> no version requierment
+    "plugin_name" -> spesfic plugin no version requierment
+    "plugin_name:version_ranges" -> plugin version matches requirements
+
+and returns one of the following:
+
+::
+    ("", "") -> no version requierment
+    ("plugin_name", "") -> plugin_name but no version requierment
+    ("plugin_name", "verison_ranges")
+
+Instance
+========
+
+Once a `System` class in instantiated there are many methods that are usable
+
+
+enable_plugins(plugins):
+------------------------------
+
+enables one or more plugins
+
+`plugins` is an iterable of Plugin class objects
+
+search(self, path):
+-------------------
+
+search a path (dir or file) for plugins, in the case of a file it
+searches the containing dir.
+
+resolve_highest_match(component, plugin, version):
+--------------------------------------------------
+resolves the latest version of a component with requirements,
+passing empty strings means no requirements
+
+in this case `plugin` is a name string and `version` is a version requirement string
+
+::
+    `version` Must match `version` exactly
+    `>version` Must be greater than `version`
+    `>=version` etc
+    `<version`
+    `<=version`
+    `1.2` 1.2.0, 1.2.1, etc., but not 1.3.0
+    `*` Matches any version
+    "" (just an empty string) Same as *
+    `version1 - version2` Same as `>=version1 <=version2`.
+    `range1 || range2` Passes if either range1 or range2 are satisfied.
+
+ittrPluginsByComponent(component, requirements=None):
+-----------------------------------------------------
+iterates over the all possible providers of a component
+returning the plugin name and the highest version possible.
+if there are postfix version mappings for a component in a plugin
+iterates over them too.
+
+load_plugin(plugin, version, requesting=None, component=None):
+--------------------------------------------------------------
+`plugin` is a plugin name and `version` is a parsed version 2 tuple
+
+requesting and component are strings used for events and errors. they should refer to the 
+'plugin@version' and 'component' that need the plugin loaded
+
+takes a plugin name and version and finds the stored Plugin object
+takes a Plugin object and loads the module
+recursively loading declared dependencies
+
+load(component, requires=None, requesting=None, bypass=False):
+--------------------------------------------------------------
+processes loading and returns the component by name,
+chain loading any required plugins to obtain dependencies.
+Uses the config that was provided on system creation
+to load correct versions, if there is a conflict throws
+a run time error.
+bypass lets the call bypass the system configuration
+
+get_plugin_module(plugin, version=None):
+----------------------------------------
+searches for the highest version number plugin with it's module loaded
+if it can't find  it it raises a runtime error
+
 ******
 Events
 ******
 
-The plugin system also includes a simple event system bount to the
-`System` object, it simply allows one to register a function to an
-event name and when `System.fire_event` is called it calls all
+The plugin system also includes a simple event system bound to the
+`system` object, it simply allows one to register a function to an
+event name and when `system.fire_event` is called it calls all
 registered functions passing the extra args and kwargs to them
 
-pyitect fires some event internally so that you can keep track of when
+pyitect fires some events internally so that you can keep track of when
 the system finds and loads plugins
 
 Using Events
@@ -414,7 +529,7 @@ System.bind_event
 -----------------
 ::
 
-    System.bind_event('name', Function)
+    system.bind_event('name', Function)
 
 binds `Function` to the event `'name'`. when an event of `'name'` is fired
 the function will be called wall all extra parameters passed to the `fire_event` call.
@@ -423,7 +538,7 @@ System.unbind_event
 -------------------
 ::
 
-    System.unbind_event('name', Function)
+    system.unbind_event('name', Function)
 
 removes `Function` form the list of functions to be called when the event is fired
 
@@ -431,11 +546,11 @@ System.fire_event
 -----------------
 ::
 
-    System.fire_event('name', *args, **kwargs)
+    system.fire_event('name', *args, **kwargs)
 
 fires the event `'name'`, calling all bound functions with `*args` and `**kwargs`
 
-Events Fired Internaly
+Events Fired Internally
 ======================
 
 
@@ -493,7 +608,7 @@ component\_loaded
 -----------------
 
 a function bound to this event is called every time a component is
-sucessfuly loaded example:
+successfully loaded example:
 
 ::
 
@@ -521,7 +636,7 @@ list them too.
 
 ::
 
-    for plugin, version in System.ittrPluginsByComponent('component_name'):
+    for plugin, version in system.ittrPluginsByComponent('component_name'):
         print("Plugin %s provides The component at version %s" % (plugin, version))
 
 ********

@@ -148,3 +148,8 @@ def test_fetch_plugin_module():
     global system
     module = system.get_plugin_module("test_plugin")
     tools.assert_true(inspect.ismodule(module))
+
+
+def test_on_enable_plugin():
+    import sys
+    tools.assert_true(hasattr(sys, "PYTITECT_TEST"))

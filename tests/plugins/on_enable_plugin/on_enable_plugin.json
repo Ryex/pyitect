@@ -3,7 +3,7 @@
     "author": "Ryex",
     "version": "0.0.1",
     "file": "plugin.py",
-    "on_enable": "dostuff.py",
+    "on_enable": "on_enable_foo_func",
     "consumes": {
 
     },

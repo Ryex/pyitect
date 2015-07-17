@@ -44,10 +44,7 @@ class Plugin(object):
         if 'version' in config:
             # store both the original version string and a parsed version that
             # can be compaired accurately
-            self.version = (
-                config['version'].strip(),
-                parse_version(config['version'].strip())
-            )
+            self.version = gen_version(config['version'].strip())
         else:
             raise RuntimeError("Plugin at '%s' does not have a version" % path)
         if 'file' in config:
@@ -95,6 +92,7 @@ class Plugin(object):
         else:
             self.on_enable = None
         self.path = path
+        self.module = None
 
     @staticmethod
     def supports_import_mode():
@@ -149,17 +147,19 @@ class Plugin(object):
 
     def load(self):
         """loads the plugin file and returns the resulting module"""
-        if self.mode == 'import':
-            plugin = self._load_import()
-        elif self.mode == 'exec':
-            plugin = self._load_exec()
-        else:
-            raise RuntimeError(
-                "Bad load mode '%s' for Plugin '%s' at '%s': "
-                "'import' and 'exec' allowed"
-                % (self.mode, self.name, self.path)
-            )
-        return plugin
+        if self.module is None:
+            if self.mode == 'import':
+                plugin = self._load_import()
+            elif self.mode == 'exec':
+                plugin = self._load_exec()
+            else:
+                raise RuntimeError(
+                    "Bad load mode '%s' for Plugin '%s' at '%s': "
+                    "'import' and 'exec' allowed"
+                    % (self.mode, self.name, self.path)
+                )
+            self.module = plugin
+        return self.module
 
     def get_version_string(self):
         """returns a version stirng"""
@@ -168,21 +168,41 @@ class Plugin(object):
     def run_on_enable(self):
         """runs the file in the 'on_enable' setting if set"""
         if self.on_enable:
+            parts = self.on_enable.split(".")
+            if len(parts) < 1:
+                raise RuntimeError(
+                    "Plugin '%s' at '%s' has an invalid object path "
+                    "in its on_enable"
+                    % (self.name, self.path)
+                )
+            if self.module is None:
+                raise RuntimeError(
+                    "Plugin '%s' at '%s' has no module object and is not "
+                    "loaded yet. can not attempt to find on_enable function"
+                    % (self.name, self.path)
+                )
+            obj = self.module
             try:
-                filepath = os.path.join(self.path, self.on_enable)
-                sys.path.insert(0, self.path)
-                with open(filepath) as f:
-                    code = compile(f.read(), filepath, 'exec')
-                    exec(code, {})
-                sys.path.remove(self.path)
+                for part in parts:
+                    obj = getattr(obj, part)
             except Exception as err:
                 raise RuntimeError(
-                    "Plugin '%s' at '%s' had an error during it's 'on_enable'"
-                    % (self.name, self.path)
+                    "Plugin '%s' at '%s' can not access 'on_enable' path '%s'"
+                    % (self.name, self.path, self.on_enable)
                 ) from err
+            if not callable(obj):
+                raise RuntimeError(
+                    "Plugin '%s' at '%s' can not call 'on_enable' path '%s', "
+                    "not callable"
+                    % (self.name, self.path, self.on_enable)
+                )
+            obj()
+
+    def has_on_enable(self):
+        return (self.on_enable is not None) and (not self.on_enable == "")
 
     def __str__(self):
-        return "Plugin %s:%s" % (self.name, self.version[0], self.path)
+        return "Plugin %s:%s" % (self.name, self.version[0])
 
     def __repr__(self):
         return "Plugin<%s:%s>@%s" % (self.name, self.version[0], self.path)
@@ -218,7 +238,7 @@ class System(object):
             loaded from (version string ie 'plugin_name:version')
 
     Pyitect keeps track of all the instances of the System class in
-    `System.systems` which is a map of object is's to instances of System.
+    `System.systems` which is a map of object id's to instances of System.
 
     """
     systems = {}
@@ -243,9 +263,38 @@ class System(object):
         self.loaded_components = {}
         self.loaded_plugins = {}
         self.enabled_plugins = {}
-        self.useing = {}
+        self.using = {}
         self.events = {}
         System.systems[id(self)] = self
+
+    @staticmethod
+    def expand_version_requierment(version):
+        """
+        Takes a string of one of the following forms:
+
+        "" -> no version requierment
+        "*" -> no version requierment
+        "plugin_name" -> spesfic plugin no version requierment
+        "plugin_name:version_ranges" -> plugin version matches requirements
+
+        and returns one of the following:
+
+        ("", "") -> no version requierment
+        ("plugin_name", "") -> plugin_name but no version requierment
+        ("plugin_name", "verison_ranges")
+        """
+        if version == "*" or version == "":
+            return ("", "")
+        elif ":" in version:
+            parts = version.split(":")
+            if len(parts) != 2:
+                raise RuntimeError(
+                    "Version requirements can only contain at most 2 parts, "
+                    "one plugin_name and one set of version requirements, "
+                    "the parts seperated by a ':'")
+            return (parts[0], parts[1])
+        else:
+            return (version,  "")
 
     def bind_event(self, event, function):
         """
@@ -278,7 +327,7 @@ class System(object):
         # either add the version or create a new array with the version and
         # save it
         if isinstance(version, str):
-            version = (version, parse_version(version))
+            version = gen_version(version)
         if plugin in self.components[component]:
             self.components[component][plugin].append(version)
         else:
@@ -346,12 +395,11 @@ class System(object):
                 self._map_component(
                     component, plugin_cfg.name, plugin_cfg.version)
 
-        plugin_cfg.run_on_enable()
-
     def enable_plugins(self, plugins):
         """
         enables one or more plugins
         """
+        on_enables = []
         if isinstance(plugins, collections.Mapping):
             # passed a dictionary
             for k in plugins:
@@ -359,6 +407,8 @@ class System(object):
                 if not isinstance(plugin, Plugin):
                     raise RuntimeError(
                         "Object '%s' is not a plugin" % str(plugin))
+                if plugin.has_on_enable():
+                    on_enables.append(plugin)
                 self._map_components(plugin)
         elif isinstance(plugins, collections.Iterable):
             # not a map but iterable
@@ -366,13 +416,24 @@ class System(object):
                 if not isinstance(plugin, Plugin):
                     raise RuntimeError(
                         "Object '%s' is not a plugin" % str(plugin))
+                if plugin.has_on_enable():
+                    on_enables.append(plugin)
                 self._map_components(plugin)
         else:
             # single plugin
             plugin = plugins
             if not isinstance(plugin, Plugin):
                 raise RuntimeError("Object '%s' is not a plugin" % str(plugin))
+            if plugin.has_on_enable():
+                    on_enables.append(plugin)
             self._map_components(plugin)
+        for plugin in on_enables:
+            self.load_plugin(
+                plugin.name,
+                plugin.version[0],
+                plugin.get_version_string() + ":on_enable"
+            )
+            plugin.run_on_enable()
 
     def _add_plugin(self, path):
         """
@@ -452,35 +513,6 @@ class System(object):
             self._search_dir(path)
         else:
             self._add_plugin(os.path.dirname(path))
-
-    @staticmethod
-    def expand_version_requierment(version):
-        """
-        Takes a string of one of the following forms:
-
-        "" -> no version requierment
-        "*" -> no version requierment
-        "plugin_name" -> spesfic plugin no version requierment
-        "plugin_name:version_ranges" -> plugin version matches requirements
-
-        and returns one of the following:
-
-        ("", "") -> no version requierment
-        ("plugin_name", "") -> plugin_name but no version requierment
-        ("plugin_name", "verison_ranges")
-        """
-        if version == "*" or version == "":
-            return ("", "")
-        elif ":" in version:
-            parts = version.split(":")
-            if len(parts) != 2:
-                raise RuntimeError(
-                    "Version requirements can only contain at most 2 parts, "
-                    "one plugin_name and one set of version requirements, "
-                    "the parts seperated by a ':'")
-            return (parts[0], parts[1])
-        else:
-            return (version,  "")
 
     def resolve_highest_match(self, component, plugin, version):
         """
@@ -564,11 +596,11 @@ class System(object):
 
                 if len(parts) != 2:
                     raise RuntimeError(
-                        "In versions useing the implicit `and` of a space "
+                        "In versions using the implicit `and` of a space "
                         "(" ") between version statements, there may only "
                         "be 2 version statments")
 
-                # they are useing implicit and, all parts must either include a
+                # they are using implicit and, all parts must either include a
                 # > or a < +/- an =, both must be present
                 wakagreaterflag = False
                 wakaleserflag = False
@@ -586,7 +618,7 @@ class System(object):
 
                 if not (wakagreaterflag and wakaleserflag):
                     raise RuntimeError(
-                        "In versions useing the implicit and of a space (" ") "
+                        "In versions using the implicit and of a space (" ") "
                         "between version statements, all parts must include "
                         "either a greater or lesser-than symbol at their "
                         "begining, both must be in use")
@@ -714,12 +746,12 @@ class System(object):
 
             # record the use of this component, perhaps so the users can save
             # the configuration
-            if component not in self.useing:
-                self.useing[component] = {}
-            if plugin not in self.useing[component]:
-                self.useing[component][plugin] = []
-            if version not in self.useing[component][plugin]:
-                self.useing[component][plugin].append(version)
+            if component not in self.using:
+                self.using[component] = {}
+            if plugin not in self.using[component]:
+                self.using[component][plugin] = []
+            if version not in self.using[component][plugin]:
+                self.using[component][plugin].append(version)
 
             self.fire_event(
                 'component_loaded',
@@ -732,16 +764,25 @@ class System(object):
         return component_obj
 
     def load_plugin(self, plugin, version, requesting=None, component=None):
+        """
+        takes a plugin name and version and finds the stored Plugin object
+        takes a Plugin object and loads the module
+        recursively loading declared dependencies
+        """
         # we dont want to load a plugin twice just becasue it provides more
         # than one component, save previouly loaded plugins
         if plugin not in self.loaded_plugins:
             self.loaded_plugins[plugin] = {}
         if version not in self.loaded_plugins[plugin]:
+            if ((plugin not in self.plugins) or
+                    (version not in self.plugins[plugin])):
+                raise RuntimeError(
+                    "Plugin system has no pluign '%s' at version '%s'"
+                    % (plugin, version)
+                )
+            plugin_cfg = self.plugins[plugin][version]
             # create a blank module namespace to attach our equired components
             consumes = types.ModuleType("PyitectConsumes")
-
-            plugin_cfg = self.plugins[plugin][version]
-
             for component_req in plugin_cfg.consumes.keys():
                 try:
                     setattr(
@@ -769,7 +810,6 @@ class System(object):
                 requesting,
                 component
             )
-
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
 
@@ -778,7 +818,7 @@ class System(object):
         processes loading and returns the component by name,
         chain loading any required plugins to obtain dependencies.
         Uses the config that was provided on system creation
-        to load correct versions, if there is a conflist throws
+        to load correct versions, if there is a conflict throws
         a run time error.
         bypass lets the call bypass the system configuration
         """
@@ -817,6 +857,10 @@ class System(object):
         return component
 
     def get_plugin_module(self, plugin, version=None):
+        """
+        searches for the highest version number plugin with it's module loaded
+        if it can't find  it it raises a runtime error
+        """
         if plugin in self.loaded_plugins:
             if not version:
                 version = sorted(
@@ -831,7 +875,21 @@ class System(object):
             raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
 
 
+def gen_version(version_str):
+    """
+    generates an internally used version tuple
+    generates a 2 tuple
+    preserving the original version string in the first position
+    a parsed version in the second
+    """
+    return (version_str, parse_version(version_str))
+
+
 def parse_version(version_str):
+    """
+    dumbly parses a version string into it's parts
+    attempts to covert from string to integers where possible
+    """
     component_re = re.compile(r'(\d+ | [a-z]+ | \.)', re.VERBOSE)
     components = [
         x
