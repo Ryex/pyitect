@@ -8,7 +8,9 @@ from .utils import PY2
 
 import os
 
-if not PY2:
+have_importlib = sys.hexversion >= 0x030400F0
+
+if have_importlib:
     import importlib.util
 else:
     import imp
@@ -85,22 +87,6 @@ class Plugin(object):
             raise RuntimeError(
                 "Plugin at '%s' hs no map of provided components"
                 " to version postfixes" % path)
-        if (('mode' in config) and
-                ((config['mode'].lower() == 'import') or
-                    (config['mode'] == 'exec'))):
-            self.mode = config['mode']
-            if self.mode == 'import' and not Plugin.supports_import_mode():
-                self.mode = 'exec'
-                warnings.warn(RuntimeWarning(
-                    "Plugin at '%s' has set 'import' mode but this mode is "
-                    "only suported in python 3.4 and up:"
-                    "\ndefaulting to 'exec' mode" % path))
-        elif not ('mode' in config):
-            self.mode = 'import' if Plugin.supports_import_mode() else 'exec'
-        else:
-            raise RuntimeError(
-                "Plugin at '%s' has bad mode, 'import' and 'exec' allowed"
-                % path)
         if 'on_enable' in config:
             if isinstance(config['on_enable'], basestring):
                 self.on_enable = config['on_enable']
@@ -113,17 +99,13 @@ class Plugin(object):
         self.path = path
         self.module = None
 
-    @staticmethod
-    def supports_import_mode():
-        return sys.hexversion >= 0x030400F0
-
-    def _load_import(self):
+    def _load(self):
         global PY2
         # import can handle cases where the file isn't a python source file,
         # for example a compiled pyhton module in the form of a .pyd or .so
         # only works with pyhton 3.4+
         filepath = os.path.join(self.path, self.file)
-        if not PY2:
+        if have_importlib:
             try:
                 sys.path.insert(0, self.path)
                 spec = importlib.util.spec_from_file_location(
@@ -165,55 +147,10 @@ class Plugin(object):
 
         return plugin
 
-    def _load_exec(self):
-        filepath = os.path.join(self.path, self.file)
-        module_name = os.path.splitext(self.file)[0]
-        # exec mode requieres the file to be raw python
-        package = False
-        if module_name == '__init__':
-            module_name = os.path.basename(self.path)
-            package = True
-        try:
-            plugin = types.ModuleType(module_name)
-            if package:
-                plugin.__package__ = module_name
-                plugin.__path__ = [self.path]
-                sys.modules[module_name] = plugin
-            else:
-                plugin.__package__ = None
-            sys.path.insert(0, self.path)
-            if PY2:
-                execfile(filepath, plugin.__dict__)
-            else:
-                with open(filepath) as f:
-                    code = compile(f.read(), filepath, 'exec')
-                    exec(code, plugin.__dict__)
-            sys.path.remove(self.path)
-            if package:
-                del sys.modules[module_name]
-        except Exception as err:
-            raise_from(
-                RuntimeError(
-                    "Plugin '%s' at '%s' failed to load"
-                    % (self.name, self.path)
-                    ),
-                err)
-
-        return plugin
-
     def load(self):
         """loads the plugin file and returns the resulting module"""
         if self.module is None:
-            if self.mode == 'import':
-                plugin = self._load_import()
-            elif self.mode == 'exec':
-                plugin = self._load_exec()
-            else:
-                raise RuntimeError(
-                    "Bad load mode '%s' for Plugin '%s' at '%s': "
-                    "'import' and 'exec' allowed"
-                    % (self.mode, self.name, self.path)
-                    )
+                plugin = self._load()
             self.module = plugin
         return self.module
 

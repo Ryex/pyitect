@@ -121,13 +121,6 @@ def test_component_version():
 
         compoents.append(test)
 
-
-def test_exec_import():
-    global system
-    Exec_Foo_Echo = system.load("Exec_Foo_Echo")
-    tools.assert_true(inspect.isfunction(Exec_Foo_Echo))
-
-
 def test_exec_import_relative():
     global system
     Exec_Foo_Echo_Relative = system.load("Exec_Foo_Echo_Relative")
