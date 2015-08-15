@@ -1,3 +1,5 @@
+from __future__ import (print_function)
+
 import sys
 def foofoofoo():
     print("foofoofoo from on_enable_plugin")

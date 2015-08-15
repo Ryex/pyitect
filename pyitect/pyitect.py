@@ -1,12 +1,33 @@
-import importlib.util
-import json
+from __future__ import (print_function)
+
 import sys
+
 import os
+
+PY2 = False
+if sys.version_info[0] == 2:
+    PY2 = True
+
+have_importlib = sys.hexversion >= 0x030400F0
+
+if have_importlib:
+    import importlib.util
+else:
+    import imp
+
+import json
+
 import types
 import collections
 import re
 import warnings
 import operator
+
+# fix types for Python2 & supprot
+try:
+    basestring
+except NameError:
+    basestring = str
 
 
 class Plugin(object):
@@ -36,7 +57,7 @@ class Plugin(object):
         else:
             raise RuntimeError(
                 "Plugin as '%s' does not have a name string" % path)
-        if 'author' in config and isinstance(config['author'], str):
+        if 'author' in config and isinstance(config['author'], basestring):
             self.author = config['author'].strip()
         else:
             raise RuntimeError(
@@ -66,24 +87,8 @@ class Plugin(object):
             raise RuntimeError(
                 "Plugin at '%s' hs no map of provided components"
                 " to version postfixes" % path)
-        if (('mode' in config) and
-                ((config['mode'].lower() == 'import') or
-                    (config['mode'] == 'exec'))):
-            self.mode = config['mode']
-            if self.mode == 'import' and not Plugin.supports_import_mode():
-                self.mode = 'exec'
-                warnings.warn(RuntimeWarning(
-                    "Plugin at '%s' has set 'import' mode but this mode is "
-                    "only suported in python 3.4 and up:"
-                    "\ndefaulting to 'exec' mode" % path))
-        elif not ('mode' in config):
-            self.mode = 'import' if Plugin.supports_import_mode() else 'exec'
-        else:
-            raise RuntimeError(
-                "Plugin at '%s' has bad mode, 'import' and 'exec' allowed"
-                % path)
         if 'on_enable' in config:
-            if isinstance(config['on_enable'], str):
+            if isinstance(config['on_enable'], basestring):
                 self.on_enable = config['on_enable']
             else:
                 raise RuntimeError(
@@ -94,70 +99,60 @@ class Plugin(object):
         self.path = path
         self.module = None
 
-    @staticmethod
-    def supports_import_mode():
-        return sys.hexversion >= 0x030400F0
-
-    def _load_import(self):
+    def _load(self):
+        global PY2
         # import can handle cases where the file isn't a python source file,
         # for example a compiled pyhton module in the form of a .pyd or .so
         # only works with pyhton 3.4+
         filepath = os.path.join(self.path, self.file)
-        try:
-            sys.path.insert(0, self.path)
-            spec = importlib.util.spec_from_file_location(self.name, filepath)
-            plugin = spec.loader.load_module()
-            sys.path.remove(self.path)
-        except Exception as err:
-            raise RuntimeError(
-                "Plugin '%s' at '%s' failed to load" % (self.name, self.path)
-            ) from err
-
-        return plugin
-
-    def _load_exec(self):
-        filepath = os.path.join(self.path, self.file)
-        module_name = os.path.splitext(self.file)[0]
-        # exec mode requieres the file to be raw python
-        package = False
-        if module_name == '__init__':
-            module_name = os.path.basename(self.path)
-            package = True
-        try:
-            plugin = types.ModuleType(module_name)
-            if package:
-                plugin.__package__ = module_name
-                plugin.__path__ = [self.path]
-                sys.modules[module_name] = plugin
-            else:
-                plugin.__package__ = None
-            sys.path.insert(0, self.path)
-            with open(filepath) as f:
-                code = compile(f.read(), filepath, 'exec')
-                exec(code, plugin.__dict__)
-            sys.path.remove(self.path)
-            if package:
-                del sys.modules[module_name]
-        except Exception as err:
-            raise RuntimeError(
-                "Plugin '%s' at '%s' failed to load" % (self.name, self.path)
-            ) from err
+        if have_importlib:
+            try:
+                sys.path.insert(0, self.path)
+                spec = importlib.util.spec_from_file_location(
+                    self.name, filepath)
+                plugin = spec.loader.load_module()
+                sys.path.remove(self.path)
+            except Exception as err:
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' failed to load"
+                    % (self.name, self.path))
+                err.strerror = message
+                raise err
+        else:
+            name = os.path.splitext(os.path.basename(self.file))[0]
+            search_path = self.path
+            if name == "__init__":
+                name = os.path.basename(self.path)
+                search_path = os.path.dirname(self.path)
+            print(self.file, name, search_path)
+            try:
+                sys.path.insert(0, search_path)
+                f, pathn, desc = imp.find_module(name, [search_path])
+                try:
+                    plugin = imp.load_module(name, f, pathn, desc)
+                except Exception as err:
+                    message = (
+                        str(err) + "\nPlugin '%s' at '%s' failed to load"
+                        % (self.name, self.path))
+                    err.strerror = message
+                    raise err
+                finally:
+                    if f:
+                        f.close()
+                sys.path.remove(search_path)
+            except Exception as err:
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' failed to load"
+                    % (self.name, self.path))
+                err.strerror = message
+                raise err
 
         return plugin
 
     def load(self):
         """loads the plugin file and returns the resulting module"""
         if self.module is None:
-            if self.mode == 'import':
-                plugin = self._load_import()
-            elif self.mode == 'exec':
-                plugin = self._load_exec()
-            else:
-                raise RuntimeError(
-                    "Bad load mode '%s' for Plugin '%s' at '%s': "
-                    "'import' and 'exec' allowed"
-                    % (self.mode, self.name, self.path)
-                )
+            plugin = self._load()
             self.module = plugin
         return self.module
 
@@ -174,28 +169,33 @@ class Plugin(object):
                     "Plugin '%s' at '%s' has an invalid object path "
                     "in its on_enable"
                     % (self.name, self.path)
-                )
+                    )
             if self.module is None:
                 raise RuntimeError(
                     "Plugin '%s' at '%s' has no module object and is not "
                     "loaded yet. can not attempt to find on_enable function"
                     % (self.name, self.path)
-                )
+                    )
             obj = self.module
             try:
                 for part in parts:
                     obj = getattr(obj, part)
             except Exception as err:
-                raise RuntimeError(
-                    "Plugin '%s' at '%s' can not access 'on_enable' path '%s'"
-                    % (self.name, self.path, self.on_enable)
-                ) from err
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' "
+                    "can not access 'on_enable' path '%s'"
+                    % (self.name, self.path, self.on_enable))
+                err.strerror = message
+                raise err
+
             if not callable(obj):
-                raise RuntimeError(
-                    "Plugin '%s' at '%s' can not call 'on_enable' path '%s', "
-                    "not callable"
-                    % (self.name, self.path, self.on_enable)
-                )
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' "
+                    "can not call 'on_enable' path '%s', not callable"
+                    % (self.name, self.path, self.on_enable))
+                err.strerror = message
+                raise err
+
             obj()
 
     def has_on_enable(self):
@@ -326,7 +326,7 @@ class System(object):
     def _map_component(self, component, plugin, version):
         # either add the version or create a new array with the version and
         # save it
-        if isinstance(version, str):
+        if isinstance(version, basestring):
             version = gen_version(version)
         if plugin in self.components[component]:
             self.components[component][plugin].append(version)
@@ -356,7 +356,7 @@ class System(object):
                         "Plugin '%s' is trying to provide component '%s' with "
                         "an invalid mapping of '%s'"
                         % (plugin_cfg.name, component, mapping)
-                    )
+                        )
                 postfix, mapped_name = arr
                 postfix = postfix.strip()
                 mapped_name = mapped_name.strip()
@@ -432,7 +432,7 @@ class System(object):
                 plugin.name,
                 plugin.version[0],
                 plugin.get_version_string() + ":on_enable"
-            )
+                )
             plugin.run_on_enable()
 
     def _add_plugin(self, path):
@@ -445,9 +445,11 @@ class System(object):
                 try:
                     cfg = json.load(cfgfile)
                 except Exception as err:
-                    raise RuntimeError(
-                        "Could not parse plugin json file at '%s'" % path
-                    ) from err
+                    message = (
+                        str(err) + "\nCould not parse plugin json file at %s"
+                        % (path,))
+                    err.strerror = message
+                    raise err
 
             if 'name' in cfg:
                 # ensure we have a place to map the version to the config
@@ -597,7 +599,7 @@ class System(object):
                 if len(parts) != 2:
                     raise RuntimeError(
                         "In versions using the implicit `and` of a space "
-                        "(" ") between version statements, there may only "
+                        "between version statements, there may only "
                         "be 2 version statments")
 
                 # they are using implicit and, all parts must either include a
@@ -649,7 +651,7 @@ class System(object):
                 self.components[component][plugin],
                 key=operator.itemgetter(1),
                 reverse=True
-            )
+                )
 
             # loop striping off verisons that are too high or too low
             while True:
@@ -758,7 +760,7 @@ class System(object):
                 component,
                 requesting,
                 plugin + ":" + version
-            )
+                )
 
         component_obj = self.loaded_components[component][plugin][version]
         return component_obj
@@ -779,7 +781,7 @@ class System(object):
                 raise RuntimeError(
                     "Plugin system has no pluign '%s' at version '%s'"
                     % (plugin, version)
-                )
+                    )
             plugin_cfg = self.plugins[plugin][version]
             # create a blank module namespace to attach our equired components
             consumes = types.ModuleType("PyitectConsumes")
@@ -792,14 +794,15 @@ class System(object):
                             component_req,
                             plugin_cfg.consumes,
                             requesting=plugin_cfg.get_version_string()
+                            )
                         )
-                    )
                 except Exception as err:
-                    raise RuntimeError(
-                        "Could not load required component "
+                    message = (
+                        str(err) + "\nCould not load required component "
                         "'%s' for plugin '%s@%s'"
-                        % (component_req, plugin, version)
-                    ) from err
+                        % (component_req, plugin, version))
+                    err.strerror = message
+                    raise err
 
             sys.modules["PyitectConsumes"] = consumes
             self.loaded_plugins[plugin][version] = plugin_cfg.load()
@@ -809,7 +812,7 @@ class System(object):
                 plugin_cfg.get_version_string(),
                 requesting,
                 component
-            )
+                )
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
 
@@ -895,7 +898,7 @@ def parse_version(version_str):
         x
         for x in component_re.split(version_str)
         if x and x != '.'
-    ]
+        ]
     for i, obj in enumerate(components):
         try:
             components[i] = int(obj)

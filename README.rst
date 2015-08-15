@@ -6,7 +6,7 @@ Pyitect
     :target: https://travis-ci.org/Ryex/pyitect
 
 A `architect <https://github.com/c9/architect>`_ inspired plugin
-framework for Python 3
+framework for Python 3 and Python >= 2.6
 
 .. contents:: Table of Contents
 
