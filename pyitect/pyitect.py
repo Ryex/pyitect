@@ -514,7 +514,9 @@ class System(object):
         # .json (or .yml/.yaml if yaml is enabled)
         # extention exists in the folder.
         names = os.listdir(path)
-        exts = (".yml", ".yaml", ".json")
+        exts = [".json"]
+        if self._yaml:
+            exts.extend([".yml", ".yaml"])
         for ext in exts:
             name = os.path.basename(path) + ext
             if name in names:
@@ -915,17 +917,6 @@ class System(object):
                     % (version, plugin))
         else:
             raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
-
-
-def build_global_system(cfg):
-    global _system
-    _system = System(cfg)
-
-
-def get_global_system():
-    global _system
-    if _system is None:
-        raise RuntimeError("no plugin ststem built yet")
 
 
 def gen_version(version_str):
