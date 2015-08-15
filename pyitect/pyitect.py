@@ -3,8 +3,8 @@ __metaclass__ = type
 
 import sys
 
-from utils import raise_from
-from utils import PY2
+from .utils import raise_from
+from .utils import PY2
 
 import os
 
@@ -20,6 +20,12 @@ import collections
 import re
 import warnings
 import operator
+
+# fix types for Python2 & supprot
+try:
+    basestring
+except NameError:
+    basestring = str
 
 
 class Plugin(object):
@@ -49,7 +55,7 @@ class Plugin(object):
         else:
             raise RuntimeError(
                 "Plugin as '%s' does not have a name string" % path)
-        if 'author' in config and isinstance(config['author'], str):
+        if 'author' in config and isinstance(config['author'], basestring):
             self.author = config['author'].strip()
         else:
             raise RuntimeError(
@@ -96,7 +102,7 @@ class Plugin(object):
                 "Plugin at '%s' has bad mode, 'import' and 'exec' allowed"
                 % path)
         if 'on_enable' in config:
-            if isinstance(config['on_enable'], str):
+            if isinstance(config['on_enable'], basestring):
                 self.on_enable = config['on_enable']
             else:
                 raise RuntimeError(
@@ -376,7 +382,7 @@ class System(object):
     def _map_component(self, component, plugin, version):
         # either add the version or create a new array with the version and
         # save it
-        if isinstance(version, str):
+        if isinstance(version, basestring):
             version = gen_version(version)
         if plugin in self.components[component]:
             self.components[component][plugin].append(version)
