@@ -150,7 +150,7 @@ class Plugin(object):
     def load(self):
         """loads the plugin file and returns the resulting module"""
         if self.module is None:
-                plugin = self._load()
+            plugin = self._load()
             self.module = plugin
         return self.module
 
