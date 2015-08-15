@@ -33,7 +33,9 @@ setup(
         "Development Status :: 4 - Beta",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 2.6",
+        "Programming Language :: Python :: 2.7",
         "License :: OSI Approved :: ISC License (ISCL)",
         "Intended Audience :: Developers",
         "Intended Audience :: Information Technology",
@@ -42,5 +44,5 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Application Frameworks"
-    ]
-)
+        ]
+    )
