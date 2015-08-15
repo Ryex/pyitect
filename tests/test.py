@@ -21,7 +21,7 @@ def setup():
 
     cfgfile = open(os.path.join(folder_path, "config.json"))
     cfg = json.load(cfgfile)
-    system = pyitect.System(cfg)
+    system = pyitect.System(cfg, enable_yaml=True)
 
     system.bind_event('plugin_found', onPluginFound)
     system.bind_event('pluign_loaded', onPluginLoad)
@@ -143,3 +143,9 @@ def test_fetch_plugin_module():
 def test_on_enable_plugin():
     import sys
     tools.assert_true(hasattr(sys, "PYTITECT_TEST"))
+
+
+def test_yaml_plugin():
+    global system
+    foo_yaml = system.load("foo_yaml")
+    tools.assert_true(foo_yaml("testmessage") == "testmessageyaml")

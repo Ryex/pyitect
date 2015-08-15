@@ -1,0 +1,9 @@
+name: yaml_plugin
+author: Ryex
+version: 0.0.1
+file: yaml_plugin.py
+
+consumes: {}
+
+provides:
+  foo_yaml: ''

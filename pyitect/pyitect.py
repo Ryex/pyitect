@@ -29,6 +29,13 @@ try:
 except NameError:
     basestring = str
 
+_have_yaml = False
+try:
+    import yaml
+    _have_yaml = True
+except ImportError:
+    pass
+
 
 class Plugin(object):
 
@@ -243,18 +250,24 @@ class System(object):
     """
     systems = {}
 
-    def __init__(self, config):
+    def __init__(self, config, enable_yaml=False):
         """
         set up the system and load a configuration that may spesify plugins
         and versions to use for spesifc components
         plugins can define their own requerments but they are superceeded by
         the system configuration (carefull you can break it)
         """
+        global _have_yaml
 
         if not isinstance(config, collections.Mapping):
             raise RuntimeError(
                 "System configurations must be mappings of component "
                 "names to 'plugin:version' strings")
+
+        if _have_yaml and enable_yaml:
+            self._yaml = True
+        else:
+            self._yaml = False
 
         self.config = config
         self.plugins = {}
@@ -439,17 +452,40 @@ class System(object):
         """
         adds a plugin form the provided path
         """
-        cfgpath = os.path.join(path, os.path.basename(path) + ".json")
-        if os.path.exists(cfgpath):
+        exts = (".yml", ".yaml", ".json")
+        yamls = (".yml", ".yaml")
+        cfgpath = None
+        is_yaml = False
+
+        for ext in exts:
+            cfgpath = os.path.join(path, os.path.basename(path) + ext)
+            if os.path.exists(cfgpath):
+                if ext in yamls:
+                    is_yaml = True
+                break
+
+        if cfgpath is not None:
             with open(cfgpath) as cfgfile:
-                try:
-                    cfg = json.load(cfgfile)
-                except Exception as err:
-                    message = (
-                        str(err) + "\nCould not parse plugin json file at %s"
-                        % (path,))
-                    err.strerror = message
-                    raise err
+                if (is_yaml and self._yaml):
+                    try:
+                        cfg = yaml.load(cfgfile)
+                    except Exception as err:
+                        message = (
+                            str(err) +
+                            "\nCould not parse plugin yaml file at %s"
+                            % (path,))
+                        err.strerror = message
+                        raise err
+                else:
+                    try:
+                        cfg = json.load(cfgfile)
+                    except Exception as err:
+                        message = (
+                            str(err) +
+                            "\nCould not parse plugin json file at %s"
+                            % (path,))
+                        err.strerror = message
+                        raise err
 
             if 'name' in cfg:
                 # ensure we have a place to map the version to the config
@@ -475,11 +511,16 @@ class System(object):
         returns true if there is a plugin in the folder pointed to by path
         """
         # a plugin exists if a file with the same name as the folder + the
-        # .json extention exists in the folder.
+        # .json (or .yml/.yaml if yaml is enabled)
+        # extention exists in the folder.
         names = os.listdir(path)
-        name = os.path.basename(path) + ".json"
-        if name in names:
-            return True
+        exts = [".json"]
+        if self._yaml:
+            exts.extend([".yml", ".yaml"])
+        for ext in exts:
+            name = os.path.basename(path) + ext
+            if name in names:
+                return True
         return False
 
     def _search_dir(self, folder):

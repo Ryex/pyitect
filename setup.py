@@ -25,8 +25,12 @@ setup(
     keywords="architect project modeler plugin",
     url="https://github.com/Ryex/pyitect",
     tests_require=[
-        "nose"
-    ],
+        "nose",
+        "pyyaml"
+        ],
+    extras_require = {
+        'yaml': 'pyyaml'
+        },
     test_suite='nose.collector',
 
     classifiers=[
