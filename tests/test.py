@@ -1,3 +1,5 @@
+from __future__ import (print_function)
+
 import os
 import json
 import inspect
@@ -38,7 +40,7 @@ def setup():
         for n in system.plugins
         for v in system.plugins[n]
         if n not in plugins_filter
-    ]
+        ]
 
     print("\nEnableing plugins")
     system.enable_plugins(plugins)
@@ -71,7 +73,7 @@ def onPluginLoad(plugin, plugin_required, component_needed):
         "plugin `%s` was loaded by plugin `%s` "
         "during a request for the `%s` component"
         % (plugin, plugin_required, component_needed)
-    )
+        )
     pluginLoadTriggered = True
 
 
@@ -87,7 +89,7 @@ def onComponentLoad(component, plugin_required, plugin_loaded):
     print(
         "Component `%s` loaded, required by `%s`, loaded from `%s`"
         % (component, plugin_required, plugin_loaded)
-    )
+        )
     componentLoadTriggered = True
 
 
@@ -120,11 +122,6 @@ def test_component_version():
         tools.assert_true(test not in compoents)
 
         compoents.append(test)
-
-def test_exec_import_relative():
-    global system
-    Exec_Foo_Echo_Relative = system.load("Exec_Foo_Echo_Relative")
-    tools.assert_true(inspect.isfunction(Exec_Foo_Echo_Relative))
 
 
 def test_relative_import():
