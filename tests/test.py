@@ -93,18 +93,36 @@ def onComponentLoad(component, plugin_required, plugin_loaded):
     componentLoadTriggered = True
 
 
+def test_events_fired():
+    global pluginFoundTriggered
+    global pluginLoadTriggered
+    global componentLoadTriggered
+
+    tools.assert_true(pluginFoundTriggered)
+    tools.assert_true(pluginLoadTriggered)
+    tools.assert_true(componentLoadTriggered)
+
+
 def test_filter_plugins():
     global system
     tools.assert_true("dead_plugin" not in system.enabled_plugins)
 
 
-def test_load_bar():
+def test_provide_foo():
     global system
-    bar = system.load("bar")
+    foo = system.load("foo")
     tools.assert_true(inspect.isfunction(bar))
+    tools.assert_true(foo() == "foo")
 
 
-def test_component_version():
+def test_consume_foo():
+    global system
+    foobar = system.load("fobar")
+    tools.assert_true(inspect.isfunction(foobar))
+    tools.assert_true(foobar() == "foobar")
+
+
+def test_multiple_components():
     global system
     versions = []
     compoents = []
@@ -128,6 +146,8 @@ def test_relative_import():
     global system
     TestClass = system.load("TestClass")
     tools.assert_true(inspect.isclass(TestClass))
+    T = TestClass("testmessage")
+    tools.assert_true(T.hello() == "testmessage")
 
 
 def test_fail_to_load_dead():
@@ -136,7 +156,7 @@ def test_fail_to_load_dead():
 
 def test_fetch_plugin_module():
     global system
-    module = system.get_plugin_module("test_plugin")
+    module = system.get_plugin_module("provide_plugin")
     tools.assert_true(inspect.ismodule(module))
 
 

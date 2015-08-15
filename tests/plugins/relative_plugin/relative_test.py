@@ -1,7 +1,5 @@
 from __future__ import (print_function)
 
-print("relative_test.py", __name__, __package__)
-
 
 class TestClass(object):
 
@@ -9,4 +7,4 @@ class TestClass(object):
         self.message = message
 
     def hello(self):
-        print(self.message)
+        return self.message

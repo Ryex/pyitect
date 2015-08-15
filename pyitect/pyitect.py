@@ -823,31 +823,35 @@ class System(object):
                     "Plugin system has no pluign '%s' at version '%s'"
                     % (plugin, version)
                     )
+            print(__name__)
             plugin_cfg = self.plugins[plugin][version]
-            # create a blank module namespace to attach our equired components
-            consumes = types.ModuleType("PyitectConsumes")
-            for component_req in plugin_cfg.consumes.keys():
+            # collect the imports namespace object
+            imports = sys.modules[__name__.split('.')[0]].imports
+            # loop through the consumed component names
+            # load them and add them to the imports namespace
+            for req_name in plugin_cfg.consumes.keys():
+                obj = None
                 try:
-                    setattr(
-                        consumes,
-                        component_req,
-                        self.load(
-                            component_req,
-                            plugin_cfg.consumes,
-                            requesting=plugin_cfg.get_version_string()
-                            )
+                    obj = self.load(
+                        req_name,
+                        plugin_cfg.consumes,
+                        requesting=plugin_cfg.get_version_string()
                         )
                 except Exception as err:
                     message = (
                         str(err) + "\nCould not load required component "
                         "'%s' for plugin '%s@%s'"
-                        % (component_req, plugin, version))
+                        % (req_name, plugin, version))
                     err.strerror = message
                     raise err
+                setattr(imports, req_name, obj)
 
-            sys.modules["PyitectConsumes"] = consumes
+            #load the plugin
             self.loaded_plugins[plugin][version] = plugin_cfg.load()
-            del sys.modules["PyitectConsumes"]
+
+            # cleanup the imports namespace
+            for req_name in plugin_cfg.consumes.keys():
+                delattr(imports, req_name)
             self.fire_event(
                 'plugin_loded',
                 plugin_cfg.get_version_string(),

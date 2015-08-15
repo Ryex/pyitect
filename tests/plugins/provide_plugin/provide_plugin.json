@@ -1,10 +1,10 @@
 {
-    "name": "test_plugin",
+    "name": "provide_plugin",
     "author": "Ryex",
     "version": "0.0.1",
-    "file" : "test_plugin.py",
+    "file" : "provide.py",
     "consumes": {
-        
+
     },
     "provides": {
         "foo" : ""
