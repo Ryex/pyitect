@@ -120,9 +120,14 @@ class Plugin(object):
                 raise err
         else:
             name = os.path.splitext(os.path.basename(self.file))[0]
+            search_path = self.path
+            if name == "__init__":
+                name = os.path.basename(self.path)
+                search_path = os.path.dirname(self.path)
+            print(self.file, name, search_path)
             try:
-                sys.path.insert(0, self.path)
-                f, pathn, desc = imp.find_module(name, self.path)
+                sys.path.insert(0, search_path)
+                f, pathn, desc = imp.find_module(name, [search_path])
                 try:
                     plugin = imp.load_module(name, f, pathn, desc)
                 except Exception as err:
@@ -132,8 +137,9 @@ class Plugin(object):
                     err.strerror = message
                     raise err
                 finally:
-                    f.close()
-                sys.path.remove(self.path)
+                    if f:
+                        f.close()
+                sys.path.remove(search_path)
             except Exception as err:
                 message = (
                     str(err) + "\nPlugin '%s' at '%s' failed to load"
