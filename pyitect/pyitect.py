@@ -182,9 +182,12 @@ class Plugin(object):
             else:
                 plugin.__package__ = None
             sys.path.insert(0, self.path)
-            with open(filepath) as f:
-                code = compile(f.read(), filepath, 'exec')
-                exec(code, plugin.__dict__)
+            if PY2:
+                execfile(filepath, plugin.__dict__)
+            else:
+                with open(filepath) as f:
+                    code = compile(f.read(), filepath, 'exec')
+                    exec(code, plugin.__dict__)
             sys.path.remove(self.path)
             if package:
                 del sys.modules[module_name]
