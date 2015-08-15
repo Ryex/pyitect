@@ -22,10 +22,35 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+import sys
+import inspect
+
 
 PY2 = False
 if sys.version_info[0] == 2:
     PY2 = True
+
+
+def _repr_strip(mystring):
+    """
+    Returns the string without any initial or final quotes.
+    """
+    r = repr(mystring)
+    if r.startswith("'") and r.endswith("'"):
+        return r[1:-1]
+    else:
+        return r
+
+
+def _get_caller_globals_and_locals():
+    """
+    Returns the globals and locals of the calling frame.
+    Is there an alternative to frame hacking here?
+    """
+    caller_frame = inspect.stack()[2]
+    myglobals = caller_frame[0].f_globals
+    mylocals = caller_frame[0].f_locals
+    return myglobals, mylocals
 
 if PY2:
     def raise_from(exc, cause):
