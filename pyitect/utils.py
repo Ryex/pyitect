@@ -62,14 +62,7 @@ if PY2:
         # Is either arg an exception class (e.g. IndexError) rather than
         # instance (e.g. IndexError('my message here')? If so, pass the
         # name of the class undisturbed through to "raise ... from ...".
-        if isinstance(exc, type) and issubclass(exc, Exception):
-            e = exc()
-            # exc = exc.__name__
-            # execstr = "e = " + _repr_strip(exc) + "()"
-            # myglobals, mylocals = _get_caller_globals_and_locals()
-            # exec(execstr, myglobals, mylocals)
-        else:
-            e = exc
+        e = exc
         e.__suppress_context__ = False
         if isinstance(cause, type) and issubclass(cause, Exception):
             e.__cause__ = cause()
