@@ -1,12 +1,12 @@
 from __future__ import (print_function)
-__metaclass__ = type
 
 import sys
 
-from .utils import raise_from
-from .utils import PY2
-
 import os
+
+PY2 = False
+if sys.version_info[0] == 2:
+    PY2 = True
 
 have_importlib = sys.hexversion >= 0x030400F0
 
@@ -113,12 +113,11 @@ class Plugin(object):
                 plugin = spec.loader.load_module()
                 sys.path.remove(self.path)
             except Exception as err:
-                raise_from(
-                    RuntimeError(
-                        "Plugin '%s' at '%s' failed to load"
-                        % (self.name, self.path)
-                        ),
-                    err)
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' failed to load"
+                    % (self.name, self.path))
+                err.strerror = message
+                raise err
         else:
             name = os.path.splitext(os.path.basename(self.file))[0]
             try:
@@ -127,23 +126,20 @@ class Plugin(object):
                 try:
                     plugin = imp.load_module(name, f, pathn, desc)
                 except Exception as err:
-                    raise_from(
-                        RuntimeError(
-                            "Plugin '%s' at '%s' failed to load"
-                            % (self.name, self.path)
-                            ),
-                        err)
-
+                    message = (
+                        str(err) + "\nPlugin '%s' at '%s' failed to load"
+                        % (self.name, self.path))
+                    err.strerror = message
+                    raise err
                 finally:
                     f.close()
                 sys.path.remove(self.path)
             except Exception as err:
-                raise_from(
-                    RuntimeError(
-                        "Plugin '%s' at '%s' failed to load"
-                        % (self.name, self.path)
-                        ),
-                    err)
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' failed to load"
+                    % (self.name, self.path))
+                err.strerror = message
+                raise err
 
         return plugin
 
@@ -179,19 +175,21 @@ class Plugin(object):
                 for part in parts:
                     obj = getattr(obj, part)
             except Exception as err:
-                raise_from(
-                    RuntimeError(
-                        "Plugin '%s' at '%s' "
-                        "can not access 'on_enable' path '%s'"
-                        % (self.name, self.path, self.on_enable)
-                        ),
-                    err)
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' "
+                    "can not access 'on_enable' path '%s'"
+                    % (self.name, self.path, self.on_enable))
+                err.strerror = message
+                raise err
+
             if not callable(obj):
-                raise RuntimeError(
-                    "Plugin '%s' at '%s' can not call 'on_enable' path '%s', "
-                    "not callable"
-                    % (self.name, self.path, self.on_enable)
-                    )
+                message = (
+                    str(err) + "\nPlugin '%s' at '%s' "
+                    "can not call 'on_enable' path '%s', not callable"
+                    % (self.name, self.path, self.on_enable))
+                err.strerror = message
+                raise err
+
             obj()
 
     def has_on_enable(self):
@@ -441,12 +439,11 @@ class System(object):
                 try:
                     cfg = json.load(cfgfile)
                 except Exception as err:
-                    raise_from(
-                        RuntimeError(
-                            "Could not parse plugin json file at %s"
-                            % (path,)
-                            ),
-                        err)
+                    message = (
+                        str(err) + "\nCould not parse plugin json file at %s"
+                        % (path,))
+                    err.strerror = message
+                    raise err
 
             if 'name' in cfg:
                 # ensure we have a place to map the version to the config
@@ -794,13 +791,12 @@ class System(object):
                             )
                         )
                 except Exception as err:
-                    raise_from(
-                        RuntimeError(
-                            "Could not load required component "
-                            "'%s' for plugin '%s@%s'"
-                            % (component_req, plugin, version)
-                            ),
-                        err)
+                    message = (
+                        str(err) + "\nCould not load required component "
+                        "'%s' for plugin '%s@%s'"
+                        % (component_req, plugin, version))
+                    err.strerror = message
+                    raise err
 
             sys.modules["PyitectConsumes"] = consumes
             self.loaded_plugins[plugin][version] = plugin_cfg.load()
