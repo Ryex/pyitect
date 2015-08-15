@@ -2,7 +2,8 @@
 Pyitect
 =======
 
-.. image:: https://travis-ci.org/Ryex/pyitect.svg
+.. image:: https://travis-ci.org/Ryex/pyitect.svg?branch=master
+    :target: https://travis-ci.org/Ryex/pyitect
 
 A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3
