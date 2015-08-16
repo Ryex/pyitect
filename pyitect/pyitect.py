@@ -8,6 +8,7 @@ from .utils import PY_VER
 from .utils import PY2
 from .utils import gen_version
 from .utils import parse_version
+from .utils import get_unique_name
 
 have_importlib = PY_VER >= (3, 4)
 
@@ -111,7 +112,7 @@ class Plugin(object):
         # for example a compiled pyhton module in the form of a .pyd or .so
         # only works with pyhton 3.4+
         filepath = os.path.join(self.path, self.file)
-        module_name = gen_unique_name(
+        module_name = get_unique_name(
             self.name,
             self.author,
             self.get_version_string())
