@@ -1,4 +1,4 @@
 {
-    "foo": "test_plugin:>=0.0.1",
-    "bar": "*"
+    "foo": "provide_plugin:<=1.0.0",
+    "foobar": "*"
 }

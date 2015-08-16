@@ -15,37 +15,6 @@ pluginLoadTriggered = None
 componentLoadTriggered = None
 
 
-def setup():
-    # setup a plugin system
-    global system
-
-    cfgfile = open(os.path.join(folder_path, "config.json"))
-    cfg = json.load(cfgfile)
-    system = pyitect.System(cfg, enable_yaml=True)
-
-    system.bind_event('plugin_found', onPluginFound)
-    system.bind_event('pluign_loaded', onPluginLoad)
-    system.bind_event('component_loaded', onComponentLoad)
-
-    print("\nSearching Plugin Path")
-    system.search(os.path.join(folder_path, "plugins"))
-
-    print("\nFiter out dead plugin before enableing plugins")
-    plugins_filter = ["dead_plugin"]
-    # get all plugin configs that arn't named dead_plugin
-    # collect plugins[<name>][<version_str>] for all names n in plugins for all
-    # versions v in plugins[n] if name not in filter
-    plugins = [
-        system.plugins[n][v]
-        for n in system.plugins
-        for v in system.plugins[n]
-        if n not in plugins_filter
-        ]
-
-    print("\nEnableing plugins")
-    system.enable_plugins(plugins)
-
-
 def load_component(name):
     global system
     return system.load(name)
@@ -93,79 +62,159 @@ def onComponentLoad(component, plugin_required, plugin_loaded):
     componentLoadTriggered = True
 
 
-def test_events_fired():
-    global pluginFoundTriggered
-    global pluginLoadTriggered
-    global componentLoadTriggered
-
-    tools.assert_true(pluginFoundTriggered)
-    tools.assert_true(pluginLoadTriggered)
-    tools.assert_true(componentLoadTriggered)
-
-
-def test_filter_plugins():
+def setup():
+    # setup a plugin system
     global system
-    tools.assert_true("dead_plugin" not in system.enabled_plugins)
+    global folder_path
+
+    cfgfile = open(os.path.join(folder_path, "config.json"))
+    cfg = json.load(cfgfile)
+    system = pyitect.System(cfg, enable_yaml=True)
+
+    print("\nFiter out dead plugin before enableing plugins")
+    plugins_filter = ["dead_plugin"]
+    # get all plugin configs that arn't named dead_plugin
+    # collect plugins[<name>][<version_str>] for all names n in plugins for all
+    # versions v in plugins[n] if name not in filter
+    plugins = [
+        system.plugins[n][v]
+        for n in system.plugins
+        for v in system.plugins[n]
+        if n not in plugins_filter
+        ]
+
+    print("\nEnableing plugins")
+    system.enable_plugins(plugins)
 
 
-def test_provide_foo():
+def test_01_bind_events():
+    global system
+    tools.ok_(not system.events)
+
+    system.bind_event('plugin_found', onPluginFound)
+    system.bind_event('plugin_loaded', onPluginLoad)
+    system.bind_event('component_loaded', onComponentLoad)
+
+    tools.ok_('plugin_found' in system.events)
+    tools.ok_('plugin_loaded' in system.events)
+    tools.ok_('component_loaded' in system.events)
+
+
+def test_02_search_plugins():
+    global system
+    global folder_path
+
+    tools.ok_(not system.plugins)
+
+    system.search(os.path.join(folder_path, "plugins"))
+
+    tools.ok_(len(system.plugins) > 0)
+
+
+def test_03_enable_plugins():
+    global system
+
+    tools.ok_(not system.components)
+    tools.ok_(not system.enabled_plugins)
+
+    plugins_filter = ["dead_plugin"]
+    # get all plugin configs that arn't named dead_plugin
+    # collect plugins[<name>][<version_str>] for all names n in plugins for all
+    # versions v in plugins[n] if name not in filter
+    plugins = [
+        system.plugins[n][v]
+        for n in system.plugins
+        for v in system.plugins[n]
+        if n not in plugins_filter
+        ]
+
+    system.enable_plugins(plugins)
+
+    tools.ok_(len(system.components) > 0)
+    tools.ok_(len(system.enabled_plugins) > 0)
+
+
+def test_04_filter_plugins():
+    global system
+    tools.ok_("dead_plugin" in system.plugins)
+    tools.ok_("dead_plugin" not in system.enabled_plugins)
+
+
+def test_05_fail_to_load_dead():
+    tools.assert_raises(RuntimeError, load_component, "foobarbar")
+
+
+def test_06_provide_foo():
     global system
     foo = system.load("foo")
-    tools.assert_true(inspect.isfunction(bar))
-    tools.assert_true(foo() == "foo")
+    tools.ok_(inspect.isfunction(foo))
+    tools.eq_(foo(), "foo")
 
 
-def test_consume_foo():
+def test_07_provide_foov2():
     global system
-    foobar = system.load("fobar")
-    tools.assert_true(inspect.isfunction(foobar))
-    tools.assert_true(foobar() == "foobar")
+    foo = system.load("foo", {"foo": "provide_plugin:=2.0.0"})
+    tools.ok_(inspect.isfunction(foo))
+    tools.eq_(foo(), "foo2")
 
 
-def test_multiple_components():
+def test_08_consume_foo():
+    global system
+    foobar = system.load("foobar")
+    tools.ok_(inspect.isfunction(foobar))
+    tools.eq_(foobar(), "foobar")
+
+
+def test_09_multiple_components():
     global system
     versions = []
     compoents = []
     for plugin, version in system.ittrPluginsByComponent("test"):
         version_string = plugin + ":" + version
 
-        tools.assert_true(version_string not in versions)
+        tools.ok_(version_string not in versions)
 
         versions.append(version_string)
 
         reqs = {"test": version_string}
         test = system.load("test", reqs)
 
-        tools.assert_true(inspect.isfunction(test))
-        tools.assert_true(test not in compoents)
+        tools.ok_(inspect.isfunction(test))
+        tools.ok_(test not in compoents)
 
         compoents.append(test)
 
 
-def test_relative_import():
+def test_10_relative_import():
     global system
     TestClass = system.load("TestClass")
-    tools.assert_true(inspect.isclass(TestClass))
+    tools.ok_(inspect.isclass(TestClass))
     T = TestClass("testmessage")
-    tools.assert_true(T.hello() == "testmessage")
+    tools.eq_(T.hello(), "testmessage")
 
 
-def test_fail_to_load_dead():
-    tools.assert_raises(RuntimeError, load_component, "foobarbar")
-
-
-def test_fetch_plugin_module():
+def test_11_fetch_plugin_module():
     global system
     module = system.get_plugin_module("provide_plugin")
-    tools.assert_true(inspect.ismodule(module))
+    tools.ok_(inspect.ismodule(module))
 
 
-def test_on_enable_plugin():
+def test_12_on_enable_plugin():
     import sys
-    tools.assert_true(hasattr(sys, "PYTITECT_TEST"))
+    tools.ok_(hasattr(sys, "PYTITECT_TEST"))
 
 
-def test_yaml_plugin():
+def test_13_yaml_plugin():
     global system
     foo_yaml = system.load("foo_yaml")
-    tools.assert_true(foo_yaml("testmessage") == "testmessageyaml")
+    tools.eq_(foo_yaml("testmessage"), "testmessageyaml")
+
+
+def test_14_events_fired():
+    global pluginFoundTriggered
+    global pluginLoadTriggered
+    global componentLoadTriggered
+
+    tools.ok_(pluginFoundTriggered)
+    tools.ok_(pluginLoadTriggered)
+    tools.ok_(componentLoadTriggered)
