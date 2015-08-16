@@ -228,6 +228,5 @@ def test_15_unique_modeule_names():
     TestClass = system.load("TestClass")
 
     print(TestClass.__module__)
-    pprint(sys.modules)
     tools.assert_not_equal(
         TestClass.__module__, "relative_plugin.relative_test")

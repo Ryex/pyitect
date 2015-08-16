@@ -572,7 +572,7 @@ class System(object):
 
         while sorted_versions:
             version = sorted_versions.pop(0)
-            if cmp_version_spec(version, spec):
+            if cmp_version_spec(version[1], spec):
                 valid_versions.append(version)
 
         return valid_versions
@@ -628,7 +628,13 @@ class System(object):
                 "Component '%s' does not have any providers that meet "
                 "requirements" % component)
 
-        return valid_versions[0]
+        sorted_versions = sorted(
+            valid_versions,
+            key=operator.itemgetter(1),
+            reverse=True
+            )
+
+        return plugin, sorted_versions[0][0]
 
     def ittrPluginsByComponent(self, compon, requirements=None):
         """

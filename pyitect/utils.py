@@ -104,7 +104,7 @@ def parse_version_spec_dot_x(version):
     """
     clear_str = version.strip()
     if clear_str[-2:] == ".x":
-        base_ver = parse_version(clear_str[-2:])
+        base_ver = parse_version(clear_str[:-2])
         to_big_ver = [x for x in base_ver]
         if not isinstance(to_big_ver[-1], int):
             warnings.warn(RuntimeWarning(
