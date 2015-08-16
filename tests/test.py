@@ -1,8 +1,10 @@
 from __future__ import (print_function)
 
 import os
+import sys
 import json
 import inspect
+from pprint import pprint
 from nose import tools
 
 import pyitect
@@ -218,3 +220,14 @@ def test_14_events_fired():
     tools.ok_(pluginFoundTriggered)
     tools.ok_(pluginLoadTriggered)
     tools.ok_(componentLoadTriggered)
+
+
+def test_15_unique_modeule_names():
+    global system
+
+    TestClass = system.load("TestClass")
+
+    print(TestClass.__module__)
+    pprint(sys.modules)
+    tools.assert_not_equal(
+        TestClass.__module__, "relative_plugin.relative_test")
