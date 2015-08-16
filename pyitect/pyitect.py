@@ -4,11 +4,12 @@ import sys
 
 import os
 
-PY2 = False
-if sys.version_info[0] == 2:
-    PY2 = True
+from .utils import PY_VER
+from .utils import PY2
+from .utils import gen_version
+from .utils import parse_version
 
-have_importlib = sys.hexversion >= 0x030400F0
+have_importlib = PY_VER >= (3, 4)
 
 if have_importlib:
     import importlib.util
@@ -17,13 +18,11 @@ else:
 
 import json
 
-import types
 import collections
-import re
 import warnings
 import operator
 
-# fix types for Python2 & supprot
+# fix types for Python2+ supprot
 try:
     basestring
 except NameError:
@@ -112,11 +111,15 @@ class Plugin(object):
         # for example a compiled pyhton module in the form of a .pyd or .so
         # only works with pyhton 3.4+
         filepath = os.path.join(self.path, self.file)
+        module_name = gen_unique_name(
+            self.name,
+            self.author,
+            self.get_version_string())
         if have_importlib:
             try:
                 sys.path.insert(0, self.path)
                 spec = importlib.util.spec_from_file_location(
-                    self.name, filepath)
+                    module_name, filepath)
                 plugin = spec.loader.load_module()
                 sys.path.remove(self.path)
             except Exception as err:
@@ -135,7 +138,7 @@ class Plugin(object):
                 sys.path.insert(0, search_path)
                 f, pathn, desc = imp.find_module(name, [search_path])
                 try:
-                    plugin = imp.load_module(name, f, pathn, desc)
+                    plugin = imp.load_module(module_name, f, pathn, desc)
                 except Exception as err:
                     message = (
                         str(err) + "\nPlugin '%s' at '%s' failed to load"
@@ -925,32 +928,3 @@ class System(object):
                     % (version, plugin))
         else:
             raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
-
-
-def gen_version(version_str):
-    """
-    generates an internally used version tuple
-    generates a 2 tuple
-    preserving the original version string in the first position
-    a parsed version in the second
-    """
-    return (version_str, parse_version(version_str))
-
-
-def parse_version(version_str):
-    """
-    dumbly parses a version string into it's parts
-    attempts to covert from string to integers where possible
-    """
-    component_re = re.compile(r'(\d+ | [a-z]+ | \.)', re.VERBOSE)
-    components = [
-        x
-        for x in component_re.split(version_str)
-        if x and x != '.'
-        ]
-    for i, obj in enumerate(components):
-        try:
-            components[i] = int(obj)
-        except ValueError:
-            pass
-    return tuple(components)
