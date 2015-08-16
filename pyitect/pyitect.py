@@ -5,10 +5,11 @@ import sys
 import os
 
 from .utils import PY_VER
-from .utils import PY2
 from .utils import gen_version
-from .utils import parse_version
 from .utils import get_unique_name
+from .utils import cmp_version_spec
+from .utils import parse_version_spec
+from .utils import expand_version_req
 
 have_importlib = PY_VER >= (3, 4)
 
@@ -112,10 +113,7 @@ class Plugin(object):
         # for example a compiled pyhton module in the form of a .pyd or .so
         # only works with pyhton 3.4+
         filepath = os.path.join(self.path, self.file)
-        module_name = get_unique_name(
-            self.name,
-            self.author,
-            self.get_version_string())
+        module_name = get_unique_name(self.author, self.get_version_string())
         if have_importlib:
             try:
                 sys.path.insert(0, self.path)
@@ -283,35 +281,6 @@ class System(object):
         self.events = {}
         System.systems[id(self)] = self
 
-    @staticmethod
-    def expand_version_requierment(version):
-        """
-        Takes a string of one of the following forms:
-
-        "" -> no version requierment
-        "*" -> no version requierment
-        "plugin_name" -> spesfic plugin no version requierment
-        "plugin_name:version_ranges" -> plugin version matches requirements
-
-        and returns one of the following:
-
-        ("", "") -> no version requierment
-        ("plugin_name", "") -> plugin_name but no version requierment
-        ("plugin_name", "verison_ranges")
-        """
-        if version == "*" or version == "":
-            return ("", "")
-        elif ":" in version:
-            parts = version.split(":")
-            if len(parts) != 2:
-                raise RuntimeError(
-                    "Version requirements can only contain at most 2 parts, "
-                    "one plugin_name and one set of version requirements, "
-                    "the parts seperated by a ':'")
-            return (parts[0], parts[1])
-        else:
-            return (version,  "")
-
     def bind_event(self, event, function):
         """
         a simple event system bound to the plugin system,
@@ -411,45 +380,94 @@ class System(object):
                 self._map_component(
                     component, plugin_cfg.name, plugin_cfg.version)
 
-    def enable_plugins(self, plugins):
+    def _enable_plugins_map(self, plugins):
+        on_enables = []
+        for k in plugins:
+            plugin = plugins[k]
+            if not isinstance(plugin, Plugin):
+                raise RuntimeError(
+                    "'%r' is not a plugin" % str(plugin))
+            if plugin.has_on_enable():
+                on_enables.append(plugin)
+            self._map_components(plugin)
+        return on_enables
+
+    def _enable_plugins_iter(self, plugins):
+        on_enables = []
+        for plugin in plugins:
+            if not isinstance(plugin, Plugin):
+                raise RuntimeError(
+                    "'%r' is not a plugin" % str(plugin))
+            if plugin.has_on_enable():
+                on_enables.append(plugin)
+            self._map_components(plugin)
+        return on_enables
+
+    def enable_plugins(self, *plugins):
         """
         enables one or more plugins
         """
-        on_enables = []
+        if len(plugins) == 1:
+            plugins = plugins[0]
+
         if isinstance(plugins, collections.Mapping):
             # passed a dictionary
-            for k in plugins:
-                plugin = plugins[k]
-                if not isinstance(plugin, Plugin):
-                    raise RuntimeError(
-                        "Object '%s' is not a plugin" % str(plugin))
-                if plugin.has_on_enable():
-                    on_enables.append(plugin)
-                self._map_components(plugin)
+            on_enables = self._enable_plugins_map(plugins)
         elif isinstance(plugins, collections.Iterable):
             # not a map but iterable
-            for plugin in plugins:
-                if not isinstance(plugin, Plugin):
-                    raise RuntimeError(
-                        "Object '%s' is not a plugin" % str(plugin))
-                if plugin.has_on_enable():
-                    on_enables.append(plugin)
-                self._map_components(plugin)
+            on_enables = self._enable_plugins_iter(plugins)
         else:
             # single plugin
             plugin = plugins
             if not isinstance(plugin, Plugin):
-                raise RuntimeError("Object '%s' is not a plugin" % str(plugin))
+                raise RuntimeError("'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                     on_enables.append(plugin)
             self._map_components(plugin)
-        for plugin in on_enables:
+        self._run_on_enables(on_enables)
+
+    def _run_on_enables(self, *plugins):
+        if len(plugins) == 1:
+            plugins = plugins[0]
+        if isinstance(plugins, Plugin):
             self.load_plugin(
-                plugin.name,
-                plugin.version[0],
-                plugin.get_version_string() + ":on_enable"
+                plugins.name,
+                plugins.version[0],
+                plugins.get_version_string() + ":on_enable"
                 )
-            plugin.run_on_enable()
+            plugins.run_on_enable()
+        elif isinstance(plugins, collections.Iterable):
+            for plugin in plugins:
+                self.load_plugin(
+                    plugin.name,
+                    plugin.version[0],
+                    plugin.get_version_string() + ":on_enable"
+                    )
+                plugin.run_on_enable()
+
+    def _read_plugin_cfg(self, path, is_yaml=False):
+        with open(path) as cfgfile:
+            if (is_yaml and self._yaml):
+                try:
+                    cfg = yaml.load(cfgfile)
+                except Exception as err:
+                    message = (
+                        str(err) +
+                        "\nCould not parse plugin yaml file at %s"
+                        % (path,))
+                    err.strerror = message
+                    raise err
+            else:
+                try:
+                    cfg = json.load(cfgfile)
+                except Exception as err:
+                    message = (
+                        str(err) +
+                        "\nCould not parse plugin json file at %s"
+                        % (path,))
+                    err.strerror = message
+                    raise err
+        return cfg
 
     def _add_plugin(self, path):
         """
@@ -468,27 +486,8 @@ class System(object):
                 break
 
         if cfgpath is not None:
-            with open(cfgpath) as cfgfile:
-                if (is_yaml and self._yaml):
-                    try:
-                        cfg = yaml.load(cfgfile)
-                    except Exception as err:
-                        message = (
-                            str(err) +
-                            "\nCould not parse plugin yaml file at %s"
-                            % (path,))
-                        err.strerror = message
-                        raise err
-                else:
-                    try:
-                        cfg = json.load(cfgfile)
-                    except Exception as err:
-                        message = (
-                            str(err) +
-                            "\nCould not parse plugin json file at %s"
-                            % (path,))
-                        err.strerror = message
-                        raise err
+
+            cfg = self._read_plugin_cfg(cfgpath, is_yaml)
 
             if 'name' in cfg:
                 # ensure we have a place to map the version to the config
@@ -561,6 +560,23 @@ class System(object):
         else:
             self._add_plugin(os.path.dirname(path))
 
+    def _find_matching_versions(self, component, plugin, spec):
+        # sorted from highest to lowest
+        sorted_versions = sorted(
+            self.components[component][plugin],
+            key=operator.itemgetter(1),
+            reverse=True
+            )
+
+        valid_versions = []
+
+        while sorted_versions:
+            version = sorted_versions.pop(0)
+            if cmp_version_spec(version, spec):
+                valid_versions.append(version)
+
+        return valid_versions
+
     def resolve_highest_match(self, component, plugin, version):
         """
         resolves the latest version of a component with requirements,
@@ -603,147 +619,16 @@ class System(object):
                 "Component '%s' is not provided by 'plugin' %s"
                 % (component, plugin))
 
-        # our requirements might pass if we satify one of a number of version
-        # ranges
-        version_ranges = []
-        if " || " in version:
-            # there are two or more version ranges, either could be satisfied
-            version_ranges = version.split(" || ")
-        else:
-            version_ranges.append(version)
+        specs = parse_version_spec(version)
 
-        # loop untill we run out of ranges to test or find a winner
-        for version_range in version_ranges:
+        valid_versions = self._find_matching_versions(component, plugin, specs)
 
-            # markers for the high and low version of the range
-            # an empty string will mean infinite and the bool indicates if the
-            # value is inclusive
-            highv = ("", False)
-            lowv = ("", False)
+        if len(valid_versions) < 1:
+            raise RuntimeError(
+                "Component '%s' does not have any providers that meet "
+                "requirements" % component)
 
-            # if the ends of the range are seperated with a dash
-            if " - " in version_range:
-                # if they've tried to mix syntaxes
-                if (("=" in version_range) or
-                        (">" in version_range) or
-                        ("<" in version_range)):
-                    raise RuntimeError(
-                        "Versions ranges defined with a '-' can not include "
-                        "additional spesifers like '=<>' ")
-                high_low = version_range.split(" - ")
-                # be sure we onyl have two versions
-                if len(high_low) != 2:
-                    raise RuntimeError(
-                        "Version ranges defined with a '-' must included "
-                        "exactly 2 versions, a high and a low")
-                highv = (high_low[0], True)
-                lowv = (high_low[1], True)
-            elif " " in version_range:
-                parts = version_range.split(" ")
-
-                if len(parts) != 2:
-                    raise RuntimeError(
-                        "In versions using the implicit `and` of a space "
-                        "between version statements, there may only "
-                        "be 2 version statments")
-
-                # they are using implicit and, all parts must either include a
-                # > or a < +/- an =, both must be present
-                wakagreaterflag = False
-                wakaleserflag = False
-
-                # we also need to establish which is the high and which is the
-                # low
-                for part in parts:
-                    equalto = (part[1] == "=")
-                    if part[0] == ">":
-                        wakagreaterflag = True
-                        lowv = (part[1:].lstrip("="), equalto)
-                    elif part[0] == "<":
-                        wakaleserflag = True
-                        highv = (part[1:].lstrip("="), equalto)
-
-                if not (wakagreaterflag and wakaleserflag):
-                    raise RuntimeError(
-                        "In versions using the implicit and of a space (" ") "
-                        "between version statements, all parts must include "
-                        "either a greater or lesser-than symbol at their "
-                        "begining, both must be in use")
-
-            else:
-                # we only have one version statment
-                statment = version_range.strip().lstrip("=")
-                equalto = False
-                if ">=" in statment or "<=" in statment:
-                    equalto = (statment[1] == "=")
-                if statment[0] == ">":
-                    wakagreaterflag = True
-                    striped = statment[1:]
-                    if equalto:
-                        striped = striped[1:]
-                    lowv = (striped, equalto)
-                elif statment[0] == "<":
-                    wakaleserflag = True
-                    striped = statment[1:]
-                    if equalto:
-                        striped = striped[1:]
-                    highv = (striped, equalto)
-                elif statment != "*" and statment != "":
-                    highv = lowv = (statment, True)
-
-            # now we parse the high and low versions to make them compairable
-            # and find a suitable version
-            highv = (highv[0], parse_version(highv[0]), highv[1])
-            lowv = (lowv[0], parse_version(lowv[0]), lowv[1])
-
-            # sorted from highest to lowest
-            sorted_versions = sorted(
-                self.components[component][plugin],
-                key=operator.itemgetter(1),
-                reverse=True
-                )
-
-            # loop striping off verisons that are too high or too low
-            while True:
-                stripdone = False
-                # if there is even a limit
-                if highv[0] != "":
-                    # if the high value is inclusive
-                    if highv[2]:
-                        if sorted_versions[0][1] > highv[1]:
-                            sorted_versions = sorted_versions[1:]
-                            stripdone = True
-                    else:
-                        if sorted_versions[0][1] >= highv[1]:
-                            sorted_versions = sorted_versions[1:]
-                            stripdone = True
-
-                # if there is even a limit
-                if lowv[0] != "":
-                    # if the low value is inclusive
-                    if lowv[2]:
-                        if (sorted_versions[len(sorted_versions) - 1][1] <
-                                lowv[1]):
-                            sorted_versions = sorted_versions[
-                                :len(sorted_versions) - 1]
-                            stripdone = True
-                    else:
-                        if (sorted_versions[len(sorted_versions) - 1][1] <=
-                                lowv[1]):
-                            sorted_versions = sorted_versions[
-                                :len(sorted_versions) - 1]
-                            stripdone = True
-
-                if not stripdone or len(sorted_versions) < 1:
-                    break
-
-            if len(sorted_versions) < 1:
-                raise RuntimeError(
-                    "Component '%s' does not have any providers that meet "
-                    "requirements" % component)
-
-            result = (plugin, sorted_versions[0][0])
-            return result
+        return valid_versions[0]
 
     def ittrPluginsByComponent(self, compon, requirements=None):
         """
@@ -896,8 +781,7 @@ class System(object):
 
         # update the plugin and version requirements if they exist
         if component in reqs:
-            plugin_req, version_req = System.expand_version_requierment(
-                reqs[component])
+            plugin_req, version_req = expand_version_req(reqs[component])
         else:
             warnings.warn(RuntimeWarning(
                 "Component '%s' has no default provided, defaulting to "
