@@ -1,0 +1,12 @@
+{
+    "name": "provide_plugin",
+    "author": "Ryex",
+    "version": "2.0.0",
+    "file" : "provide.py",
+    "consumes": {
+
+    },
+    "provides": {
+        "foo" : ""
+    }
+}

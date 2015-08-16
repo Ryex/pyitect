@@ -1,0 +1,12 @@
+{
+    "name": "consume_plugin",
+    "author": "Ryex",
+    "version": "0.0.1",
+    "file" : "consume.py",
+    "consumes": {
+        "foo" : "provide_plugin:<=1.0.0"
+    },
+    "provides": {
+        "foobar" : ""
+    }
+}

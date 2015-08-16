@@ -131,7 +131,6 @@ class Plugin(object):
             if name == "__init__":
                 name = os.path.basename(self.path)
                 search_path = os.path.dirname(self.path)
-            print(self.file, name, search_path)
             try:
                 sys.path.insert(0, search_path)
                 f, pathn, desc = imp.find_module(name, [search_path])
@@ -489,22 +488,23 @@ class System(object):
 
             if 'name' in cfg:
                 # ensure we have a place to map the version to the config
-                if not cfg['name'] in self.plugins:
+                if cfg['name'] not in self.plugins:
                     self.plugins[cfg['name']] = {}
-                # map the name and vserion to the config, use only the version
-                # string not the full tuple
-                plugin = Plugin(cfg, path)
-                if (not self.plugins[cfg['name']] or
-                        not self.plugins[cfg['name']][cfg['version']]):
+                if cfg['version'] not in self.plugins[cfg['name']]:
+                    # map the name and vserion to the config
+                    # use only the version string not the full tuple
+                    plugin = Plugin(cfg, path)
                     self.plugins[cfg['name']][cfg['version']] = plugin
                     self.fire_event(
                         'plugin_found', path, plugin.get_version_string())
                 else:
-                    raise RuntimeError("Duplicate plugin name at '%s'" % path)
+                    raise RuntimeError(
+                        "Duplicate plugin %s@%s at '%s'"
+                        % (cfg['name'], cfg['version'], path))
             else:
-                raise RuntimeError("Plugin at %s has no name" % path)
+                raise RuntimeError("Plugin at %s has no name" % (path,))
         else:
-            raise RuntimeError("No plugin exists at %s" % path)
+            raise RuntimeError("No plugin exists at %s" % (path,))
 
     def _identify_plugin(self, path):
         """
@@ -669,16 +669,21 @@ class System(object):
             else:
                 # we only have one version statment
                 statment = version_range.strip().lstrip("=")
-
                 equalto = False
                 if ">=" in statment or "<=" in statment:
                     equalto = (statment[1] == "=")
                 if statment[0] == ">":
                     wakagreaterflag = True
-                    lowv = (statment[1:], equalto)
+                    striped = statment[1:]
+                    if equalto:
+                        striped = striped[1:]
+                    lowv = (striped, equalto)
                 elif statment[0] == "<":
                     wakaleserflag = True
-                    highv = (statment[1:], equalto)
+                    striped = statment[1:]
+                    if equalto:
+                        striped = striped[1:]
+                    highv = (striped, equalto)
                 elif statment != "*" and statment != "":
                     highv = lowv = (statment, True)
 
@@ -824,32 +829,35 @@ class System(object):
                     % (plugin, version)
                     )
             plugin_cfg = self.plugins[plugin][version]
-            # create a blank module namespace to attach our equired components
-            consumes = types.ModuleType("PyitectConsumes")
-            for component_req in plugin_cfg.consumes.keys():
+            # collect the imports namespace object
+            imports = sys.modules[__name__.split('.')[0]].imports
+            # loop through the consumed component names
+            # load them and add them to the imports namespace
+            for req_name in plugin_cfg.consumes.keys():
+                obj = None
                 try:
-                    setattr(
-                        consumes,
-                        component_req,
-                        self.load(
-                            component_req,
-                            plugin_cfg.consumes,
-                            requesting=plugin_cfg.get_version_string()
-                            )
+                    obj = self.load(
+                        req_name,
+                        plugin_cfg.consumes,
+                        requesting=plugin_cfg.get_version_string()
                         )
                 except Exception as err:
                     message = (
                         str(err) + "\nCould not load required component "
                         "'%s' for plugin '%s@%s'"
-                        % (component_req, plugin, version))
+                        % (req_name, plugin, version))
                     err.strerror = message
                     raise err
+                setattr(imports, req_name, obj)
 
-            sys.modules["PyitectConsumes"] = consumes
+            # load the plugin
             self.loaded_plugins[plugin][version] = plugin_cfg.load()
-            del sys.modules["PyitectConsumes"]
+
+            # cleanup the imports namespace
+            for req_name in plugin_cfg.consumes.keys():
+                delattr(imports, req_name)
             self.fire_event(
-                'plugin_loded',
+                'plugin_loaded',
                 plugin_cfg.get_version_string(),
                 requesting,
                 component
