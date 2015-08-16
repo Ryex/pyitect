@@ -4,30 +4,10 @@ pyitect package
 Submodules
 ----------
 
-pyitect.imports module
-----------------------
+.. toctree::
 
-.. automodule:: pyitect.imports
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-pyitect.pyitect module
-----------------------
-
-.. automodule:: pyitect.pyitect
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-pyitect.utils module
---------------------
-
-.. automodule:: pyitect.utils
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
+   pyitect.imports
+   pyitect.utils
 
 Module contents
 ---------------
@@ -36,3 +16,4 @@ Module contents
     :members:
     :undoc-members:
     :show-inheritance:
+    :imported-members:
