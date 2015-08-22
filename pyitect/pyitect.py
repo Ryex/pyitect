@@ -23,6 +23,7 @@ import json
 import collections
 import warnings
 import operator
+from semantic_version import Version, Spec
 
 # fix types for Python2+ supprot
 try:
@@ -63,43 +64,43 @@ class Plugin(object):
         if 'name' in config:
             self.name = config['name'].strip()
         else:
-            raise RuntimeError(
+            raise ValueError(
                 "Plugin as '%s' does not have a name string" % path)
         if 'author' in config and isinstance(config['author'], basestring):
             self.author = config['author'].strip()
         else:
-            raise RuntimeError(
+            raise ValueError(
                 "Plugin as '%s' does not have a author string" % path)
         if 'version' in config:
             # store both the original version string and a parsed version that
             # can be compaired accurately
             self.version = gen_version(config['version'].strip())
         else:
-            raise RuntimeError("Plugin at '%s' does not have a version" % path)
+            raise ValueError("Plugin at '%s' does not have a version" % path)
         if 'file' in config:
             self.file = config['file'].strip()
         else:
-            raise RuntimeError(
+            raise ValueError(
                 "Plugin as '%s' does not have a plugin file spesified" % path)
         if (('consumes' in config) and
                 isinstance(config['consumes'], collections.Mapping)):
             self.consumes = config['consumes']
         else:
-            raise RuntimeError(
+            raise ValueError(
                 "Plugin at '%s' has no map of consumed "
                 "components to plugin versions" % path)
         if (('provides' in config) and
                 isinstance(config['provides'], collections.Mapping)):
             self.provides = config['provides']
         else:
-            raise RuntimeError(
+            raise ValueError(
                 "Plugin at '%s' hs no map of provided components"
                 " to version postfixes" % path)
         if 'on_enable' in config:
             if isinstance(config['on_enable'], basestring):
                 self.on_enable = config['on_enable']
             else:
-                raise RuntimeError(
+                raise ValueError(
                     "Plugin at '%s' has a 'on_enable' that is not a string"
                     % path)
         else:
@@ -166,7 +167,7 @@ class Plugin(object):
 
     def get_version_string(self):
         """returns a version stirng"""
-        return self.name + ":" + self.version[0]
+        return self.name + ":" + str(self.version)
 
     def run_on_enable(self):
         """runs the file in the 'on_enable' setting if set"""
@@ -210,10 +211,10 @@ class Plugin(object):
         return (self.on_enable is not None) and (not self.on_enable == "")
 
     def __str__(self):
-        return "Plugin %s:%s" % (self.name, self.version[0])
+        return "Plugin %s:%s" % (self.name, self.version)
 
     def __repr__(self):
-        return "Plugin<%s:%s>@%s" % (self.name, self.version[0], self.path)
+        return "Plugin<%s:%s>@%s" % (self.name, self.version, self.path)
 
 
 class System(object):
@@ -345,7 +346,7 @@ class System(object):
                 postfix, mapped_name = arr
                 postfix = postfix.strip()
                 mapped_name = mapped_name.strip()
-                version = plugin_cfg.version[0]
+                version = plugin_cfg.version
                 if postfix:
                     version += '-' + postfix
 
@@ -432,17 +433,15 @@ class System(object):
         if isinstance(plugins, Plugin):
             self.load_plugin(
                 plugins.name,
-                plugins.version[0],
-                plugins.get_version_string() + ":on_enable"
-                )
+                plugins.version,
+                plugins.get_version_string() + ":on_enable")
             plugins.run_on_enable()
         elif isinstance(plugins, collections.Iterable):
             for plugin in plugins:
                 self.load_plugin(
                     plugin.name,
-                    plugin.version[0],
-                    plugin.get_version_string() + ":on_enable"
-                    )
+                    plugin.version,
+                    plugin.get_version_string() + ":on_enable")
                 plugin.run_on_enable()
 
     def _read_plugin_cfg(self, path, is_yaml=False):
