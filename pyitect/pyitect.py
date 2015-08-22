@@ -17,7 +17,6 @@ import json
 
 import collections
 import warnings
-import operator
 import hashlib
 
 from semantic_version import Version, Spec
@@ -106,7 +105,7 @@ class Plugin(object):
         self.module = None
 
     def key(self):
-        return (self.name, self.author, self.version)
+        return (self.name, self.version)
 
     def _load(self):
         global PY2
@@ -216,6 +215,19 @@ class Plugin(object):
     def __repr__(self):
         return "Plugin<%s:%s>@%s" % (self.name, self.version, self.path)
 
+    def __eq__(self, other):
+        if not isinstance(other, Plugin):
+            return False
+        if not self.key() == other.key():
+            return False
+        if not self.author == other.author():
+            return False
+        if not self.path == other.path:
+            return False
+
+    def __hash__(self):
+        return hash((self.name, self.author, self.version, self.path))
+
 
 class Component(object):
 
@@ -236,9 +248,6 @@ class Component(object):
         self.version = version
         self.path = path
 
-    def __call__(self):
-        return self.obj
-
     def key(self):
         return (self.name, self.plugin, self.author, self.version, self.path)
 
@@ -250,7 +259,7 @@ class Component(object):
         return True
 
     def __hash__(self):
-        return hash(self.__key())
+        return hash(self.key())
 
 
 class System(object):
@@ -364,9 +373,6 @@ class System(object):
             raise ValueError(
                 "Invalid requierment type, must be string, list, or tuple: %r"
                 % (reqs,))
-
-        if isinstance(comp, Component):
-            comp = comp.name
         if not isinstance(comp, basestring):
             raise ValueError(
                 "comp is niether a Component instance nor a string: %r"
@@ -633,9 +639,6 @@ class System(object):
                 "Component '%s' is not provided by any plugin"
                 % (component,))
 
-        # we have no result yet
-        result = None
-
         # if we've failed to give a requierment for somthing fill it ourselves
         if plugin == "":
             # we are gettign the first plugin name in a acending alpha-numeric
@@ -657,50 +660,65 @@ class System(object):
 
         return plugin, highest_valid
 
-    def _load_component(self, component, plugin, version, requesting=None):
+    def _load_component(self, component, plugin, version, request=None):
 
         # be sure not to load things twice, but besure the components is loaded
         # and saved
-        if component not in self.loaded_components:
-            self.loaded_components[component] = {}
-        if plugin not in self.loaded_components[component]:
-            self.loaded_components[component][plugin] = {}
-        if version not in self.loaded_components[component][plugin]:
+        if not isinstance(component, basestring):
+            raise TypeError(
+                "component must be a component name string, "
+                "got: %r" % (component,))
+        if not isinstance(plugin, basestring):
+            raise TypeError(
+                "plugin must be a plugin name string, "
+                "got: %r" % (plugin,))
+        if isinstance(version, basestring):
+            version = Version(version)
+        if not isinstance(version, Version):
+            raise TypeError(
+                "Version must be a SemVer Version, "
+                "got: %r" % (version,))
+        if component not in self.components_map:
+            raise RuntimeError(
+                "Component '%s' is not provided by any plugin"
+                % (component,))
+        if (plugin not in self.components[component]
+                or version not in self.components[component][plugin]):
+            raise RuntimeError(
+                "Component '%s' is not provided by plugin '%s@%s'"
+                % (component, plugin, version))
+
+        comp = self.component_map[component][plugin][version]
+
+        key = comp.key()
+        if key not in self.components:
 
             plugin_obj = self.load_plugin(
-                plugin, version, requesting=requesting, component=component)
+                plugin, version, request=request, comp=component)
 
-            access_name = component
-            if (plugin in self.postfix_mappings and
-                    component in self.postfix_mappings[plugin] and
-                    version in self.postfix_mappings[plugin][component]):
-                access_name = self.postfix_mappings[plugin][component][version]
-            if not hasattr(plugin_obj, access_name):
-                raise RuntimeError(
-                    "Plugin '%s:%s' does not have name '%s'"
-                    % (plugin, version, access_name))
+            obj = plugin_obj
+            parts = comp.path.split(".")
+            for part in parts:
+                if not hasattr(obj, part):
+                    raise RuntimeError(
+                        "Plugin '%s:%s' does not have name '%s'"
+                        % (plugin, version, comp.path))
+                obj = getattr(obj, part)
 
-            self.loaded_components[component][plugin][
-                version] = getattr(plugin_obj, access_name)
+            self.components[key] = obj
 
             # record the use of this component, perhaps so the users can save
             # the configuration
-            if component not in self.using:
-                self.using[component] = {}
-            if plugin not in self.using[component]:
-                self.using[component][plugin] = []
-            if version not in self.using[component][plugin]:
-                self.using[component][plugin].append(version)
+            self.using.append(key)
 
             self.fire_event(
                 'component_loaded',
                 component,
-                requesting,
-                plugin + ":" + version
+                request,
+                plugin + ":" + str(version)
                 )
 
-        component_obj = self.loaded_components[component][plugin][version]
-        return component_obj
+        return self.components[key]
 
     def load_plugin(self, plugin, version, request=None, comp=None):
         """
@@ -712,24 +730,32 @@ class System(object):
         # than one component, save previouly loaded plugins
         if isinstance(version, basestring):
             version = Version(version)
-        plugin_key = (plugin, author, version)
+        if not isinstance(plugin, basestring):
+            raise TypeError(
+                "plugin must be a plugin name string, "
+                "got: %r" % (plugin,))
+        if not isinstance(version, Version):
+            raise TypeError(
+                "Version must be a SemVer Version, "
+                "got: %r" % (version,))
+        plugin_key = (plugin, version)
         if plugin_key not in self.loaded_plugins:
             if plugin_key not in self.plugins:
                 raise RuntimeError(
                     "System has no plugin '%s' at version '%s'"
                     % (plugin, version))
-            plugin_cfg = self.plugins[plugin_key]
+            cfg = self.plugins[plugin_key]
             # collect the imports namespace object
             imports = sys.modules[__name__.split('.')[0]].imports
             # loop through the consumed component names
             # load them and add them to the imports namespace
-            for req_name in plugin_cfg.consumes.keys():
+            for req_name in cfg.consumes.keys():
                 obj = None
                 try:
                     obj = self.load(
                         req_name,
-                        plugin_cfg.consumes,
-                        requesting=plugin_cfg.get_version_string()
+                        cfg.consumes,
+                        request=cfg.get_version_string()
                         )
                 except Exception as err:
                     message = (
@@ -741,16 +767,16 @@ class System(object):
                 setattr(imports, req_name, obj)
 
             # load the plugin
-            self.loaded_plugins[plugin][version] = plugin_cfg.load()
+            self.loaded_plugins[plugin_key] = cfg.load()
 
             # cleanup the imports namespace
-            for req_name in plugin_cfg.consumes.keys():
+            for req_name in cfg.consumes.keys():
                 delattr(imports, req_name)
             self.fire_event(
                 'plugin_loaded',
-                plugin_cfg.get_version_string(),
-                requesting,
-                component
+                cfg.get_version_string(),
+                request,
+                comp
                 )
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
@@ -794,9 +820,9 @@ class System(object):
         plugin, version = self.resolve_highest_match(
             component, plugin_req, version_spec)
 
-        component = self._load_component(component, plugin, version)
+        comp_obj = self._load_component(component, plugin, version)
 
-        return component
+        return comp_obj
 
     def get_plugin_module(self, plugin, version=None):
         """
@@ -868,10 +894,10 @@ def expand_version_req(requires):
         else:
             return (requires,  Spec("*"))
     elif isinstance(requires, collections.Mapping):
-        if "plugin" not in requiers:
+        if "plugin" not in requires:
             raise ValueError(
                 "Version requirements mappings must contain a 'plugin' key")
-        if "spec" not in requiers:
+        if "spec" not in requires:
             raise ValueError(
                 "Version requirements mappings must contain a 'spec' key")
         return (requires["plugin"], Spec(requires["spec"]))
