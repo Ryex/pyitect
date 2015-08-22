@@ -7,6 +7,11 @@ import inspect
 from pprint import pprint
 from nose import tools
 
+folder_path = os.path.dirname(os.path.abspath(__file__))
+
+pyitect_path = os.path.dirname(folder_path)
+sys.path.insert(0, pyitect_path)
+
 import pyitect
 
 folder_path = os.path.dirname(os.path.abspath(__file__))
@@ -73,21 +78,6 @@ def setup():
     cfg = json.load(cfgfile)
     system = pyitect.System(cfg, enable_yaml=True)
 
-    print("\nFiter out dead plugin before enableing plugins")
-    plugins_filter = ["dead_plugin"]
-    # get all plugin configs that arn't named dead_plugin
-    # collect plugins[<name>][<version_str>] for all names n in plugins for all
-    # versions v in plugins[n] if name not in filter
-    plugins = [
-        system.plugins[n][v]
-        for n in system.plugins
-        for v in system.plugins[n]
-        if n not in plugins_filter
-        ]
-
-    print("\nEnableing plugins")
-    system.enable_plugins(plugins)
-
 
 def test_01_bind_events():
     global system
@@ -132,7 +122,7 @@ def test_03_enable_plugins():
 
     system.enable_plugins(plugins)
 
-    tools.ok_(len(system.components) > 0)
+    tools.ok_(len(system.component_map) > 0)
     tools.ok_(len(system.enabled_plugins) > 0)
 
 
@@ -155,7 +145,7 @@ def test_06_provide_foo():
 
 def test_07_provide_foov2():
     global system
-    foo = system.load("foo", {"foo": "provide_plugin:=2.0.0"})
+    foo = system.load("foo", {"foo": "provide_plugin:==2.0.0"})
     tools.ok_(inspect.isfunction(foo))
     tools.eq_(foo(), "foo2")
 
@@ -167,24 +157,27 @@ def test_08_consume_foo():
     tools.eq_(foobar(), "foobar")
 
 
-def test_09_multiple_components():
+def test_09_components_subtypes():
     global system
     versions = []
-    compoents = []
-    for plugin, version in system.ittrPluginsByComponent("test"):
-        version_string = plugin + ":" + version
+    components = []
+
+    subtypes = ("test.test1", "test.test2", "test.test3")
+    for subtype in system.iter_component_subtypes("test"):
+        tools.ok_(subtype in subtypes)
+    for comp, plugin, version in system.iter_component_providers("test", subs=True):
+        version_string = comp + ":" + plugin + ":" + version
 
         tools.ok_(version_string not in versions)
 
         versions.append(version_string)
 
-        reqs = {"test": version_string}
-        test = system.load("test", reqs)
+        test = system.load(comp)
 
         tools.ok_(inspect.isfunction(test))
-        tools.ok_(test not in compoents)
+        tools.ok_(test not in components)
 
-        compoents.append(test)
+        components.append(test)
 
 
 def test_10_relative_import():

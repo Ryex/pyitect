@@ -5,7 +5,7 @@ import sys
 import os
 
 PY_VER = sys.version_info[:2]
-PY2 = PY_VER[0]
+PY2 = PY_VER[0] == 2
 have_importlib = PY_VER >= (3, 4)
 
 if have_importlib:
@@ -16,7 +16,6 @@ else:
 import json
 
 import collections
-import warnings
 import hashlib
 
 from semantic_version import Version, Spec
@@ -105,7 +104,7 @@ class Plugin(object):
         self.module = None
 
     def key(self):
-        return (self.name, self.version)
+        return (self.name, self.author, self.version, self.path)
 
     def _load(self):
         global PY2
@@ -220,13 +219,10 @@ class Plugin(object):
             return False
         if not self.key() == other.key():
             return False
-        if not self.author == other.author():
-            return False
-        if not self.path == other.path:
-            return False
+        return True
 
     def __hash__(self):
-        return hash((self.name, self.author, self.version, self.path))
+        return hash(self.key())
 
 
 class Component(object):
@@ -405,7 +401,7 @@ class System(object):
         # versions
 
         # save the plugin as enabled
-        plugin_key = (plugin.name, plugin.author, plugin.version)
+        plugin_key = (plugin.name, plugin.version)
         if plugin_key not in self.enabled_plugins:
             self.enabled_plugins.append(plugin_key)
 
@@ -541,14 +537,17 @@ class System(object):
             cfg = self._read_plugin_cfg(cfgpath, is_yaml)
 
             plugin = Plugin(cfg, path)
-            plugin_key = plugin.key()
+            name = plugin.name
+            version = plugin.version
+            if name not in self.plugins:
+                self.plugins[name] = {}
 
-            if plugin_key in self.plugins:
+            if version in self.plugins[name]:
                 raise RuntimeError(
                     "Duplicate plugin %s@%s at '%s'"
-                    % (cfg['name'], cfg['version'], path))
+                    % (name, version, path))
 
-            self.plugins[plugin_key] = plugin
+            self.plugins[name][version] = plugin
             self.fire_event('plugin_found', path, plugin.get_version_string())
 
         else:
@@ -634,7 +633,7 @@ class System(object):
                 "Version spec must be a SemVer version spec, "
                 "got: %r" % (spec,))
 
-        if component not in self.components_map:
+        if component not in self.component_map:
             raise RuntimeError(
                 "Component '%s' is not provided by any plugin"
                 % (component,))
@@ -643,14 +642,14 @@ class System(object):
         if plugin == "":
             # we are gettign the first plugin name in a acending alpha-numeric
             # sort
-            plugin = sorted(list(self.components_map[component].keys()))[0]
+            plugin = sorted(list(self.component_map[component].keys()))[0]
 
-        if plugin not in self.components[component]:
+        if plugin not in self.component_map[component]:
             raise RuntimeError(
                 "Component '%s' is not provided by plugin '%s'"
                 % (component, plugin))
 
-        versions = self.components_map[component][plugin].keys()
+        versions = self.component_map[component][plugin].keys()
         highest_valid = spec.select(versions)
 
         if not highest_valid:
@@ -678,12 +677,12 @@ class System(object):
             raise TypeError(
                 "Version must be a SemVer Version, "
                 "got: %r" % (version,))
-        if component not in self.components_map:
+        if component not in self.component_map:
             raise RuntimeError(
                 "Component '%s' is not provided by any plugin"
                 % (component,))
-        if (plugin not in self.components[component]
-                or version not in self.components[component][plugin]):
+        if (plugin not in self.component_map[component]
+                or version not in self.component_map[component][plugin]):
             raise RuntimeError(
                 "Component '%s' is not provided by plugin '%s@%s'"
                 % (component, plugin, version))
@@ -740,11 +739,12 @@ class System(object):
                 "got: %r" % (version,))
         plugin_key = (plugin, version)
         if plugin_key not in self.loaded_plugins:
-            if plugin_key not in self.plugins:
+            if (plugin not in self.plugins
+                    or version not in self.plugins[plugin]):
                 raise RuntimeError(
                     "System has no plugin '%s' at version '%s'"
                     % (plugin, version))
-            cfg = self.plugins[plugin_key]
+            cfg = self.plugins[plugin][version]
             # collect the imports namespace object
             imports = sys.modules[__name__.split('.')[0]].imports
             # loop through the consumed component names
@@ -778,7 +778,7 @@ class System(object):
                 request,
                 comp
                 )
-        plugin_obj = self.loaded_plugins[plugin][version]
+        plugin_obj = self.loaded_plugins[plugin_key]
         return plugin_obj
 
     def load(self, component, requires=None, request=None, bypass=False):
@@ -810,11 +810,6 @@ class System(object):
         # update the plugin and version requirements if they exist
         if component in reqs:
             plugin_req, version_spec = expand_version_req(reqs[component])
-        else:
-            warnings.warn(RuntimeWarning(
-                "Component '%s' has no default provided, defaulting to "
-                "alphabetical order"
-                % component))
 
         # get the plugin and version to load
         plugin, version = self.resolve_highest_match(
@@ -829,18 +824,26 @@ class System(object):
         searches for the highest version number plugin with it's module loaded
         if it can't find  it it raises a runtime error
         """
-        if plugin in self.loaded_plugins:
+        if version:
+            if isinstance(version, basestring):
+                version = Version(version)
+            if not isinstance(version, Version):
+                raise TypeError(
+                    "Version must be a SemVer Version, "
+                    "got: %r" % (version,))
+        if plugin in self.plugins:
             if not version:
                 version = sorted(
-                    self.loaded_plugins[plugin].keys(), reverse=True)[0]
-            if version in self.loaded_plugins[plugin]:
-                return self.loaded_plugins[plugin][version]
+                    self.plugins[plugin].keys(), reverse=True)[0]
+            plugin_key = (plugin, version)
+            if plugin_key in self.loaded_plugins:
+                return self.loaded_plugins[plugin_key]
             else:
                 raise RuntimeError(
                     "Version '%s' of plugin '%s' not yet loaded"
                     % (version, plugin))
         else:
-            raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
+            raise RuntimeError("Plugin '%s' not found" % plugin)
 
 
 def expand_version_req(requires):
