@@ -516,7 +516,7 @@ class System(object):
                     raise err
         return cfg
 
-    def _add_plugin(self, path):
+    def add_plugin(self, path):
         """
         adds a plugin form the provided path
         """
@@ -553,7 +553,7 @@ class System(object):
         else:
             raise RuntimeError("No plugin exists at %s" % (path,))
 
-    def _identify_plugin(self, path):
+    def is_plugin(self, path):
         """
         returns true if there is a plugin in the folder pointed to by path
         """
@@ -586,8 +586,8 @@ class System(object):
             for name in names:
                 file = os.path.join(path, name)
                 if os.path.isdir(file):
-                    if self._identify_plugin(file):
-                        self._add_plugin(file)
+                    if self.is_plugin(file):
+                        self.add_plugin(file)
                     else:
                         paths.append(file)
 
@@ -602,7 +602,7 @@ class System(object):
         if os.path.isdir(path):
             self._search_dir(path)
         else:
-            self._add_plugin(os.path.dirname(path))
+            self.add_plugin(os.path.dirname(path))
 
     def resolve_highest_match(self, component, plugin, spec):
         """resolves the latest version of a component with requirements,
