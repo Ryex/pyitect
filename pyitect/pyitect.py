@@ -216,6 +216,43 @@ class Plugin(object):
         return "Plugin<%s:%s>@%s" % (self.name, self.version[0], self.path)
 
 
+class Component(object):
+
+    def __init__(self, name, path, plugin, version, obj):
+        if not isinstance(name, basestring):
+            raise TypeError("name must be a string component name")
+        if not isinstance(path, basestring):
+            raise TypeError("path must be a str fully qualified name of obj")
+        if not isinstance(plugin, basestring):
+            raise TypeError("plugin must be a string plugin name")
+        if not isinstance(version, tuple):
+            raise TypeError("must be a tuple representing a version")
+        self.name = name
+        self.path = path
+        self.plugin = plugin
+        self.version = version
+        self.obj = obj
+
+    def __call__(self):
+        return self.obj
+
+    def __eq__(self, other):
+        if not isinstance(other, Component):
+            return False
+        if not self.name == other.name:
+            return False
+        if not self.path == other.path:
+            return False
+        if not self.plugin == other.plugin:
+            return False
+        if not self.version == other.version:
+            return False
+        return True
+
+    def __hash__(self):
+        return hash((self.name, self.path, self.plugin, self.version))
+
+
 class System(object):
 
     """
@@ -819,3 +856,37 @@ class System(object):
                     % (version, plugin))
         else:
             raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
+
+
+def issubcomponent(comp1, comp2):
+    """Check if comp1 is a subtype of comp2
+
+    Returns whether the Component passed as comp1 validates
+    as a subtype of the Component passed as comp2.
+
+    if strings are passed as either peramater they are treated as Component
+    names. if a Component instance is passed it's `name` property is pulled.
+
+    Args:
+        comp1 (str, Component): The Component or component name to check
+        comp2 (str, Component): The Component or component name to compair to
+    """
+    if isinstance(comp1, Component):
+        comp1 = comp1.name
+    if isinstance(comp2, Component):
+        comp2 = comp2.name
+    if not isinstance(comp1, basestring):
+        raise TypeError("comp1 must either be a string name or Component")
+    if not isinstance(comp2, basestring):
+        raise TypeError("comp2 must either be a string name or Component")
+
+    comp1_parts = comp1.split(".")
+    comp2_parts = comp2.split(".")
+
+    if len(comp2_parts) < len(comp1_parts):
+        return False
+
+    if not tuple(comp1_parts) == tuple(comp2_parts[:len(comp1_parts)]):
+        return False
+
+    return True

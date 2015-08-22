@@ -6,6 +6,12 @@ import warnings
 PY_VER = sys.version_info[:2]
 PY2 = PY_VER[0] == 2
 
+# fix types for Python2+ supprot
+try:
+    basestring
+except NameError:
+    basestring = str
+
 
 def _str_encode(obj):
     # ensure bytes is there in Python2
@@ -22,6 +28,24 @@ def get_unique_name(*parts):
     return str(name_hash.hexdigest())
 
 
+def walk_qual_name(name):
+    """Attempts to walk fully qualified name to obtain the object
+
+    Args:
+        name (str): a dot '.' seperated string of names
+        walkable form sys.modules
+
+    Raises:
+        KeyError: when module does not exist
+        AttributeError: when part of the names can not be found
+    """
+    parts = name.split(".")
+    obj = sys.modules[parts[0]]
+    for part in parts[1:]
+        obj = getattr(obj, part)
+    return obj
+
+
 def gen_version(version_str):
     """
     generates an internally used version tuple
@@ -30,6 +54,9 @@ def gen_version(version_str):
     a parsed version in the second
     """
     return (version_str, parse_version(version_str))
+
+
+def
 
 
 def parse_version_spec(version):
@@ -125,7 +152,7 @@ def cmp_version_spec(version, spec):
         # this is an and/or/not spec
         return cmp_verison_spec_and_or_not(version, spec)
     else:
-        return cmp_version_oper(version, spec)
+        return cmp_version_spec_oper(version, spec)
 
 
 def cmp_verison_spec_and_or_not(version, spec):
@@ -160,7 +187,7 @@ def cmp_version_spec_not(version, spec):
     return True
 
 
-def cmp_version_oper(version, spec):
+def cmp_version_spec_oper(version, spec):
     if spec[1] not in ('>', '<', "<=", '>=', "==", "!="):
         raise RuntimeError("Bad spec oper %s" % spec[1])
     if spec[1] == '==':
