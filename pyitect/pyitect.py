@@ -219,15 +219,17 @@ class Plugin(object):
 
 class Component(object):
 
-    def __init__(self, name, author, plugin, version, path):
+    def __init__(self, name, plugin, author, version, path):
         if not isinstance(name, basestring):
             raise TypeError("name must be a string component name")
-        if not isinstance(author, basestring):
-            raise TypeError("author must be a string author name")
         if not isinstance(plugin, basestring):
             raise TypeError("plugin must be a string plugin name")
-        if not isinstance(version, tuple):
-            raise TypeError("must be a tuple representing a version")
+        if not isinstance(author, basestring):
+            raise TypeError("author must be a string author name")
+        if not isinstance(version, Version):
+            raise TypeError("must be a SemVer Version")
+        if not isinstance(path, basestring):
+            raise TypeError("path must be a string path to object")
         self.name = name
         self.author = author
         self.plugin = plugin
@@ -238,12 +240,12 @@ class Component(object):
         return self.obj
 
     def key(self):
-        return (self.name, self.plugin, self.author, self.version)
+        return (self.name, self.plugin, self.author, self.version, self.path)
 
     def __eq__(self, other):
         if not isinstance(other, Component):
             return False
-        if not self.__key() == other.__key():
+        if not self.key() == other.key():
             return False
         return True
 
@@ -378,7 +380,7 @@ class System(object):
             comps = (comp,)
 
         for com in comps:
-            if com in self.component_map.keys and issubcomponent(com, comp):
+            if com in self.component_map and issubcomponent(com, comp):
                 providers = self.component_map[com]
                 for prov in providers:
                     versions = providers[prov]
@@ -388,47 +390,7 @@ class System(object):
                     else:
                         yield (com, prov, spec.select(versions))
 
-    @classmethod
-    def _expand_mapping(cls, name, mapping):
-        if isinstance(mapping, basestring):
-            return {
-                "path": name,
-                "spec": mapping
-                }
-        elif isinstance(mapping, collections.Mapping):
-            if "path" not in mapping:
-                raise ValueError(
-                    "Component %s mapping contains no path key: %r"
-                    % (name, mapping))
-            if "spec" not in mapping:
-                raise ValueError(
-                    "Component %s mapping contains no spec key: %r"
-                    % (name, mapping))
-            return mapping
-        elif isinstance(mapping, collections.Iterable):
-            return {
-                "path": name,
-                "spec": mapping
-                }
-        else:
-            raise ValueError(
-                "Component %s mapping must be either a spec string, "
-                "a mapping with 'path' and 'spec' keys, "
-                "or a list of spec stirngs. got: %r"
-                % (name, mapping))
-
-    def _map_component(self, component, plugin, version):
-        # either add the version or create a new array with the version and
-        # save it
-        if isinstance(version, basestring):
-            version = gen_version(version)
-        if plugin in self.components[component]:
-            self.components[component][plugin].append(version)
-        else:
-            self.components[component][plugin] = [version, ]
-        self.fire_event('component_mapped', component, plugin, version)
-
-    def _enable_plugin(self, plugin_cfg):
+    def _enable_plugin(self, plugin):
         """
         takes a plugins metadata and remembers it's provided components so
         the system is awear of them
@@ -437,30 +399,33 @@ class System(object):
         # versions
 
         # save the plugin as enabled
-        plugin_key = (plugin_cfg.name, plugin_cfg.author, plugin_cfg.version)
+        plugin_key = (plugin.name, plugin.author, plugin.version)
         if plugin_key not in self.enabled_plugins:
             self.enabled_plugins.append(plugin_key)
 
-
-        for component, mapping in plugin_cfg.provides.items():
+        for name, path in plugin.provides.items():
 
             # ensure a place to list component providing plugin versions
-            if component not in self.component_map:
-                self.components[component] = {}
-            if plugin_cfg.name not in self.components[component]:
-                self.components[component][plugin_cfg.name] = []
+            if name not in self.component_map:
+                self.component_map[name] = {}
+            if plugin.name not in self.component_map[name]:
+                self.component_map[name][plugin.name] = {}
+            if plugin.version in self.component_map[name][plugin.name]:
+                raise RuntimeError(
+                    "Duplicate component %s provided by plugin %s@%s"
+                    % (name, plugin.name, plugin.version))
 
-            if mapping:
-                mappings = mapping.split("|")
-                if len(mappings) < 1:
-                    self._map_component(
-                        component, plugin_cfg.name, map_postfix(mappings))
-                for pair in mappings:
-                    self._map_component(
-                        component, plugin_cfg.name, map_postfix(pair))
-            else:
-                self._map_component(
-                    component, plugin_cfg.name, plugin_cfg.version)
+            if not path:
+                path = name
+
+            component = Component(
+                name,
+                plugin.name,
+                plugin.author,
+                plugin.version,
+                path)
+
+            self.component_map[name][plugin.name][plugin.version] = component
 
     def _enable_plugins_map(self, plugins):
         on_enables = []
@@ -471,7 +436,7 @@ class System(object):
                     "'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                 on_enables.append(plugin)
-            self._map_components(plugin)
+            self._enable_plugin(plugin)
         return on_enables
 
     def _enable_plugins_iter(self, plugins):
@@ -482,7 +447,7 @@ class System(object):
                     "'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                 on_enables.append(plugin)
-            self._map_components(plugin)
+            self._enable_plugin(plugin)
         return on_enables
 
     def enable_plugins(self, *plugins):
@@ -505,7 +470,7 @@ class System(object):
                 raise RuntimeError("'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                     on_enables.append(plugin)
-            self._map_components(plugin)
+            self._enable_plugin(plugin)
         self._run_on_enables(on_enables)
 
     def _run_on_enables(self, *plugins):
@@ -634,39 +599,39 @@ class System(object):
         else:
             self._add_plugin(os.path.dirname(path))
 
-    def _find_matching_versions(self, component, plugin, spec):
-        # sorted from highest to lowest
-        sorted_versions = sorted(
-            self.components[component][plugin],
-            key=operator.itemgetter(1),
-            reverse=True
-            )
+    def resolve_highest_match(self, component, plugin, spec):
+        """resolves the latest version of a component with requirements,
 
-        valid_versions = []
+        takes in a component name and some requierments and gets a valid plugin
+        name and its highest version
 
-        while sorted_versions:
-            version = sorted_versions.pop(0)
-            if cmp_version_spec(version[1], spec):
-                valid_versions.append(version)
+        Args:
+            component (str): a component name
+            plugin (str): a plugin name
+                if it's empty we default to alphabetical order
+            spec (Spec): a SemVer version spec
 
-        return valid_versions
+        Raises:
+            TypeError: if somthing isn't the right type
 
-    def resolve_highest_match(self, component, plugin, version):
         """
-        resolves the latest version of a component with requirements,
-        passing empty strings means no requirements
+        if not isinstance(component, basestring):
+            raise TypeError(
+                "component must be a component name string, "
+                "got: %r" % (component,))
+        if not isinstance(plugin, basestring):
+            raise TypeError(
+                "plugin must be a plugin name string, "
+                "got: %r" % (plugin,))
+        if not isinstance(spec, Spec):
+            raise TypeError(
+                "Version spec must be a SemVer version spec, "
+                "got: %r" % (spec,))
 
-        `version` Must match `version` exactly
-        `>version` Must be greater than `version`
-        `>=version` etc
-        `<version`
-        `<=version`
-        `1.2` 1.2.0, 1.2.1, etc., but not 1.3.0
-        `*` Matches any version
-        "" (just an empty string) Same as *
-        `version1 - version2` Same as `>=version1 <=version2`.
-        `range1 || range2` Passes if either range1 or range2 are satisfied.
-        """
+        if component not in self.components_map:
+            raise RuntimeError(
+                "Component '%s' is not provided by any plugin"
+                % (component,))
 
         # we have no result yet
         result = None
@@ -675,40 +640,22 @@ class System(object):
         if plugin == "":
             # we are gettign the first plugin name in a acending alpha-numeric
             # sort
-            plugin = sorted(self.components[component])[0]
-
-        if version == "":
-            # sort the versions for the plugin and chouse the highest one, get
-            # only the version string
-            version = sorted(self.components[component][
-                             plugin], key=operator.itemgetter(1), reverse=True
-                             )[0][0]
-            # if we've fallen back to the highest version we know of then there
-            # is no point veryifying it's existance, we know of it after all
-            result = (plugin, version)
-            return result
+            plugin = sorted(list(self.components_map[component].keys()))[0]
 
         if plugin not in self.components[component]:
             raise RuntimeError(
-                "Component '%s' is not provided by 'plugin' %s"
+                "Component '%s' is not provided by plugin '%s'"
                 % (component, plugin))
 
-        specs = parse_version_spec(version)
+        versions = self.components_map[component][plugin].keys()
+        highest_valid = spec.select(versions)
 
-        valid_versions = self._find_matching_versions(component, plugin, specs)
-
-        if len(valid_versions) < 1:
+        if not highest_valid:
             raise RuntimeError(
                 "Component '%s' does not have any providers that meet "
                 "requirements" % component)
 
-        sorted_versions = sorted(
-            valid_versions,
-            key=operator.itemgetter(1),
-            reverse=True
-            )
-
-        return plugin, sorted_versions[0][0]
+        return plugin, highest_valid
 
     def _load_component(self, component, plugin, version, requesting=None):
 
@@ -755,7 +702,7 @@ class System(object):
         component_obj = self.loaded_components[component][plugin][version]
         return component_obj
 
-    def load_plugin(self, plugin, version, requesting=None, component=None):
+    def load_plugin(self, plugin, version, request=None, comp=None):
         """
         takes a plugin name and version and finds the stored Plugin object
         takes a Plugin object and loads the module
@@ -763,16 +710,15 @@ class System(object):
         """
         # we dont want to load a plugin twice just becasue it provides more
         # than one component, save previouly loaded plugins
-        if plugin not in self.loaded_plugins:
-            self.loaded_plugins[plugin] = {}
-        if version not in self.loaded_plugins[plugin]:
-            if ((plugin not in self.plugins) or
-                    (version not in self.plugins[plugin])):
+        if isinstance(version, basestring):
+            version = Version(version)
+        plugin_key = (plugin, author, version)
+        if plugin_key not in self.loaded_plugins:
+            if plugin_key not in self.plugins:
                 raise RuntimeError(
-                    "Plugin system has no pluign '%s' at version '%s'"
-                    % (plugin, version)
-                    )
-            plugin_cfg = self.plugins[plugin][version]
+                    "System has no plugin '%s' at version '%s'"
+                    % (plugin, version))
+            plugin_cfg = self.plugins[plugin_key]
             # collect the imports namespace object
             imports = sys.modules[__name__.split('.')[0]].imports
             # loop through the consumed component names
@@ -809,7 +755,7 @@ class System(object):
         plugin_obj = self.loaded_plugins[plugin][version]
         return plugin_obj
 
-    def load(self, component, requires=None, requesting=None, bypass=False):
+    def load(self, component, requires=None, request=None, bypass=False):
         """
         processes loading and returns the component by name,
         chain loading any required plugins to obtain dependencies.
@@ -819,8 +765,9 @@ class System(object):
         bypass lets the call bypass the system configuration
         """
         # set default requirements
-        plugin = version = plugin_req = version_req = ""
-        if component not in self.components:
+        plugin = version = plugin_req = ""
+        version_spec = Spec("*")
+        if component not in self.component_map:
             raise RuntimeError(
                 "Component '%s' not provided by any enabled plugins"
                 % component)
@@ -836,7 +783,7 @@ class System(object):
 
         # update the plugin and version requirements if they exist
         if component in reqs:
-            plugin_req, version_req = expand_version_req(reqs[component])
+            plugin_req, version_spec = expand_version_req(reqs[component])
         else:
             warnings.warn(RuntimeWarning(
                 "Component '%s' has no default provided, defaulting to "
@@ -845,7 +792,7 @@ class System(object):
 
         # get the plugin and version to load
         plugin, version = self.resolve_highest_match(
-            component, plugin_req, version_req)
+            component, plugin_req, version_spec)
 
         component = self._load_component(component, plugin, version)
 
@@ -868,6 +815,71 @@ class System(object):
                     % (version, plugin))
         else:
             raise RuntimeError("Plugin '%s' not yet loaded" % plugin)
+
+
+def expand_version_req(requires):
+    """Take a requierment and return the Spec and the plugin name
+
+    takes a requierment and pumps out a plugin name and a SemVer Spec
+    requires is either a string of the form
+    `("", "*", "plugin_name", plugin_name:version_spec)`
+
+    or a mapping with `plugin` and `spec` keys like so
+    `{"plugin": "plugin_name", "spec": ">=1.0.0"}`
+    the spec key's value can be a string of comma seperated version
+    requierments or a list of strings of the same
+
+    Args:
+        requires (str, mapping):
+            string or mapping object with `plugin` and `spec` keys
+
+    Examples:
+
+        >>> expand_version_req("")
+        ('', <Spec: (<SpecItem: * ''>,)>)
+        >>> expand_version_req("*")
+        ('', <Spec: (<SpecItem: * ''>,)>)
+        >>> expand_version_req("plugin_name")
+        ('plugin_name', <Spec: (<SpecItem: * ''>,)>)
+        >>> expand_version_req("plugin_name:>=1.0.0")
+        ('plugin_name', <Spec: (<SpecItem: >= Version('1.0.0')>,)>)
+        >>> expand_version_req("plugin_name:>=1.0.0,<2.0.0")
+        ('plugin_name', <Spec: (SpecItems... >= 1.0.0, < 2.0.0 )>)
+        >>> expand_version_req({"plugin": "plugin_name", "spec": ">=1.0.0"})
+        ('plugin_name', <Spec: (<SpecItem: >= Version('1.0.0')>,)>)
+
+    Raises:
+        ValueError: when the requierment is of a bad form
+        TypeError: when the requiers objt is not a string or mapping
+
+    """
+    if isinstance(requires, basestring):
+        if requires == "*" or requires == "":
+            return ("", Spec("*"))
+        elif ":" in requires:
+            parts = requires.split(":")
+            if len(parts) != 2:
+                raise ValueError(
+                    "Version requirements strings can only contain "
+                    "at most 2 parts, "
+                    "one plugin_name and one set of version requirements, "
+                    "the parts seperated by a ':'")
+            return (parts[0], Spec(parts[1]))
+        else:
+            return (requires,  Spec("*"))
+    elif isinstance(requires, collections.Mapping):
+        if "plugin" not in requiers:
+            raise ValueError(
+                "Version requirements mappings must contain a 'plugin' key")
+        if "spec" not in requiers:
+            raise ValueError(
+                "Version requirements mappings must contain a 'spec' key")
+        return (requires["plugin"], Spec(requires["spec"]))
+    else:
+        raise TypeError(
+            "Invalid type of requires object, "
+            "must be a string or mapping object: %r"
+            % (requires,))
 
 
 def gen_version(version_str):
