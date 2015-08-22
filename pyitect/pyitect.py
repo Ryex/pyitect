@@ -672,7 +672,7 @@ class System(object):
                 "plugin must be a plugin name string, "
                 "got: %r" % (plugin,))
         if isinstance(version, basestring):
-            version = Version(version)
+            version = gen_version(version)
         if not isinstance(version, Version):
             raise TypeError(
                 "Version must be a SemVer Version, "
@@ -728,7 +728,7 @@ class System(object):
         # we dont want to load a plugin twice just becasue it provides more
         # than one component, save previouly loaded plugins
         if isinstance(version, basestring):
-            version = Version(version)
+            version = gen_version(version)
         if not isinstance(plugin, basestring):
             raise TypeError(
                 "plugin must be a plugin name string, "
@@ -826,7 +826,7 @@ class System(object):
         """
         if version:
             if isinstance(version, basestring):
-                version = Version(version)
+                version = gen_version(version)
             if not isinstance(version, Version):
                 raise TypeError(
                     "Version must be a SemVer Version, "
