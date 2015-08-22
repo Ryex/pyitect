@@ -11,5 +11,6 @@ script: nosetests --exe
 #ensure pyyaml is there for testing
 install:
   - pip install pyyaml
+  - pip install semantic_version
 
 sudo: false

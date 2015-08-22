@@ -3,7 +3,6 @@
     "author": "Ryex",
     "version": "0.0.1",
     "file": "__init__.py",
-    "mode": "exec",
     "consumes": {
 
     },
