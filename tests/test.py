@@ -165,7 +165,8 @@ def test_09_components_subtypes():
     subtypes = ("test.test1", "test.test2", "test.test3")
     for subtype in system.iter_component_subtypes("test"):
         tools.ok_(subtype in subtypes)
-    for comp, plugin, version in system.iter_component_providers("test", subs=True):
+    for prov in system.iter_component_providers("test", subs=True):
+        comp, plugin, version = prov
         version_string = comp + ":" + plugin + ":" + version
 
         tools.ok_(version_string not in versions)
@@ -215,7 +216,7 @@ def test_14_events_fired():
     tools.ok_(componentLoadTriggered)
 
 
-def test_15_unique_modeule_names():
+def test_15_unique_module_names():
     global system
 
     TestClass = system.load("TestClass")

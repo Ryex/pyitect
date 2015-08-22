@@ -938,24 +938,6 @@ def get_unique_name(*parts):
     return str(name_hash.hexdigest())
 
 
-def walk_qual_name(name):
-    """Attempts to walk fully qualified name to obtain the object
-
-    Args:
-        name (str): a dot '.' seperated string of names
-        walkable form sys.modules
-
-    Raises:
-        KeyError: when module does not exist
-        AttributeError: when part of the names can not be found
-    """
-    parts = name.split(".")
-    obj = sys.modules[parts[0]]
-    for part in parts[1:]:
-        obj = getattr(obj, part)
-    return obj
-
-
 def issubcomponent(comp1, comp2):
     """Check if comp1 is a subtype of comp2
 
