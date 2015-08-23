@@ -7,5 +7,6 @@ def foofoofoo():
     return "foofoofoo"
 
 
-def on_enable_foo_func():
+def on_enable_foo_func(plugin):
+    print(plugin)
     sys.PYTITECT_TEST = True
