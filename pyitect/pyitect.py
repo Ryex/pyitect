@@ -611,14 +611,14 @@ class System(object):
             self.load_plugin(
                 plugins.name,
                 plugins.version,
-                plugins.get_version_string() + ":on_enable")
+                request=plugins.get_version_string() + ":on_enable")
             plugins.run_on_enable()
         elif isinstance(plugins, collections.Iterable):
             for plugin in plugins:
                 self.load_plugin(
                     plugin.name,
                     plugin.version,
-                    plugin.get_version_string() + ":on_enable")
+                    request=plugin.get_version_string() + ":on_enable")
                 plugin.run_on_enable()
 
     def _read_plugin_cfg(self, path, is_yaml=False):
@@ -796,8 +796,8 @@ class System(object):
 
         return plugin, highest_valid
 
-    def _load_component(self, component, plugin,
-                        version, requires=None, request=None):
+    def _load_component(self, component, plugin, version,
+                        requires=None, request=None):
 
         # be sure not to load things twice, but besure the components is loaded
         # and saved
@@ -908,13 +908,17 @@ class System(object):
             imports = sys.modules[__name__.split('.')[0]].imports
             # loop through the consumed component names
             # load them and add them to the imports namespace
+            reqs = {}
+            reqs.update(cfg.consumes)
+            if requires:
+                print(requires)
+                reqs.update(requires)
             for req_name in cfg.consumes.keys():
                 obj = None
                 try:
                     obj = self.load(
                         req_name,
-                        cfg.consumes,
-                        requires=requires,
+                        requires=reqs,
                         request=cfg.get_version_string()
                         )
                 except Exception as err:
