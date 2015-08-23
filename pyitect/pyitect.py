@@ -487,7 +487,7 @@ class System(object):
             subs (bool): should subtypes be yeilded too?
             vers (bool): should all version be yeilded not just the highest?
             reqs (str, list, tuple): version spec string or list there of
-            all items are passed to a :class:`Spec`
+            all items are passed to a `Spec`
         """
         if isinstance(reqs, basestring):
             reqs = (reqs,)
