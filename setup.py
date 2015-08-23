@@ -1,11 +1,13 @@
 #!/usr/bin/python3
 from setuptools import setup, find_packages
 import os
+import re
+import codecs
 
 local_file = lambda *f: \
     open(os.path.join(os.path.dirname(__file__), *f)).read()
 
-
+root_dir = os.path.abspath(os.path.dirname(__file__))
 def get_version(package_name):
     version_re = re.compile(r"^__version__ = [\"']([\w_.-]+)[\"']$")
     package_components = package_name.split('.')
@@ -33,7 +35,6 @@ setup(
     name=PACKAGE,
     version=get_version(PACKAGE),
     packages=find_packages(),
-    install_requires=["setuptools >= 1.0"],
     include_package_data=True,
     # metadata for upload to PyPI
     author='Benjamin "Ryex" Powers',
@@ -49,8 +50,9 @@ setup(
     url="https://github.com/Ryex/pyitect",
     download_url='https://pypi.python.org/pypi/pyitect/',
     install_requires=[
+        "setuptools>=1.0",
         "semantic_version>=2.4.2"
-    ]
+        ],
     tests_require=[
         "nose",
         "pyyaml"
