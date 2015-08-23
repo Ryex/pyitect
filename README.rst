@@ -8,57 +8,10 @@ Pyitect
 A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3 and Python >= 2.6
 
-.. contents:: Table of Contents
-
-*****************
-What is a Plugin?
-*****************
+.. toctree::
+   :maxdepth: 4
 
 
-a plugin to pyitect is simply a folder with a .json file of the same
-name inside
-
-::
-
-    /Im-A-Plugin
-        Im-A-Plugin.json
-        file.py
-
-A plugin has a name, a version, an author, a module file, and it provides
-Components used to build your application. components are simply names
-in the module's namespace after the file is imported
-
-a plugin's json file provides information about the plugin as well as
-lists components it provides and components it needs on load
-
-here's an example, all fields are mandatory but the consumes and
-provides CAN be left as empty containers, but then the plugin would be
-useless would it not? not providing components and all?
-
-::
-
-    {
-        "name": "Im-A-Plugin",
-        "author": "Ryex",
-        "version": "0.0.1",
-        "file": "file.py",
-        "mode": "import", // optional either 'import' or 'exec'
-        "on_enable": "dostuff.py", // optional, runs this file when the plugin is enabled
-        "consumes": {
-            "foo" : ""
-        },
-        "provides": {
-            "Bar": ""
-        }
-    }
-
--  **name** -> the name of the plugin (No spaces)
--  **author** -> the author of the plugin
--  **version** -> a version for the plugin, a string that can be any form set up tools supports
--  **file** -> a path to the file that when imported will provide a module who's namespace contains all provided plugins
--  **mode** -> (OPTIONAL) defaults to `import` on python 3.4 and up `exec` otherwise: sets the import mode
--  **consumes** -> a mapping of needed component names to version strings, empty string = no requirement
--  **provides** -> a mapping of provided component names to prefix mappings
 
 ********************
 Version Requirements

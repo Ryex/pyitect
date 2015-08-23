@@ -7,7 +7,6 @@ Submodules
 .. toctree::
 
    pyitect.imports
-   pyitect.utils
 
 Module contents
 ---------------
