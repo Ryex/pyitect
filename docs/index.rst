@@ -17,6 +17,14 @@ A simple Framework that Provides the facility to load Component form plugins.
 
 Also binds a simple event system to bind functions to events on the system.
 
+Links
+======
+
+- GitHub: https://github.com/Ryex/pyitect
+- PyPi: https://pypi.python.org/pypi/pyitect
+- Travic-CI: https://travis-ci.org/Ryex/pyitect
+- Docs: http://pyitect.readthedocs.org/en/latest/
+
 Contents:
 
 .. toctree::
