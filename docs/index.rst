@@ -25,6 +25,7 @@ Contents:
    pyitect
    plugins
    system
+   events
    changelog
 
 
