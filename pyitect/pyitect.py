@@ -36,25 +36,40 @@ except ImportError:
 
 class Plugin(object):
 
-    """
-    an object that can hold the metadata for a plugin,
+    """An object that can hold the metadata for a plugin
+
     like its name, author, verison, and the file to be loaded ect.
+    also stores the path to the plugin folder and provideds functionality
+    to load the plugin module and run its `on_enable` function
 
 
-    properties:
-    name - plugin name
-    author - plugin author
-    version - pluing vesion
-    file - the file to import to load the plugin
-    consumes - a listing of the components consumed
-    provides - a listing of the components provided
+    Attributes:
+        name (str): plugin name
+        author (str): plugin author
+        version (Version): plugin vesion
+        file (str): relative path to the file to import to load the plugin
+        consumes (dict): a listing of the components consumed
+        provides (dict): a listing of the components provided
+        on_enable (None, str): either `None` or a str doted name of a function
+            in the module
+        path (str): an absolute path to the plugin folder
+        module (None, object): either `None` or the modlue object if the plugin
+            has been loaded already
 
     """
 
     def __init__(self, config, path):
-        """
-        init the plugin container object and pull information from it's passed
-        config, storing the path where it can be found
+        """Init the plugin container object
+
+        and pull information from it's passed config,
+        storing the path where it can be found
+
+        Args:
+            config (dict): a mapping object that holds data from a config file
+            path (str): the absolute path to the plugin's folder
+
+        Raises:
+            ValueError: when any of the config keys are wrong
         """
         if 'name' in config:
             self.name = config['name'].strip()
@@ -104,6 +119,11 @@ class Plugin(object):
         self.module = None
 
     def key(self):
+        """return a key that can be used to identify the plugin
+
+        Returns:
+            tuple: (name, author, version, path)
+        """
         return (self.name, self.author, self.version, self.path)
 
     def _load(self):
@@ -164,11 +184,11 @@ class Plugin(object):
         return self.module
 
     def get_version_string(self):
-        """returns a version stirng"""
+        """returns a version string"""
         return self.name + ":" + str(self.version)
 
     def run_on_enable(self):
-        """runs the file in the 'on_enable' setting if set"""
+        """runs the function in the 'on_enable' if set"""
         if self.on_enable:
             parts = self.on_enable.split(".")
             if len(parts) < 1:
@@ -203,16 +223,17 @@ class Plugin(object):
                 err.strerror = message
                 raise err
 
-            obj()
+            obj(self)
 
     def has_on_enable(self):
+        """returns `True` if it has an `on_enable` attribute that's not None"""
         return (self.on_enable is not None) and (not self.on_enable == "")
 
     def __str__(self):
-        return "Plugin %s:%s" % (self.name, self.version)
+        return self.get_version_string()
 
     def __repr__(self):
-        return "Plugin<%s:%s>@%s" % (self.name, self.version, self.path)
+        return "Plugin(%s:%s@%s)" % (self.name, self.version, self.path)
 
     def __eq__(self, other):
         if not isinstance(other, Plugin):
@@ -226,14 +247,39 @@ class Plugin(object):
 
 
 class Component(object):
+    """An object to hold metadata for a spesfic instance of a component
+
+    Holds the metadata needed to identify a instance of a component
+    provided by a plugin
+
+    Attributes:
+        name (str): the component name provided
+        plugin (str): the name of the providing plugin
+        author (str): the author of the providing plugin
+        version (Version): the verison of the providing plugin
+        path (str): a doted name path to the component object from the top
+            of the plugin module
+    """
 
     def __init__(self, name, plugin, author, version, path):
+        """Init the component object
+
+        Args:
+            name (str): the component name provided
+            plugin (str): the name of the providing plugin
+            author (str): the author of the providing plugin
+            version (Version, str): the verison of the providing plugin
+            path (str): a doted name path to the component object from the top
+                of the plugin module
+        """
         if not isinstance(name, basestring):
             raise TypeError("name must be a string component name")
         if not isinstance(plugin, basestring):
             raise TypeError("plugin must be a string plugin name")
         if not isinstance(author, basestring):
             raise TypeError("author must be a string author name")
+        if isinstance(version, basestring):
+            version = gen_version(version)
         if not isinstance(version, Version):
             raise TypeError("must be a SemVer Version")
         if not isinstance(path, basestring):
@@ -245,6 +291,11 @@ class Component(object):
         self.path = path
 
     def key(self):
+        """returns a key to identify this component
+
+        Returns:
+            tuple: (name, plugin, author, version, path)
+        """
         return (self.name, self.plugin, self.author, self.version, self.path)
 
     def __eq__(self, other):
@@ -259,46 +310,81 @@ class Component(object):
 
 
 class System(object):
+    """A plugin system
 
-    """
-    a plugin system
     It can scan dir trees to find plugins and their provided/needed components,
     and with a simple load call chain load all the plugins needed.
 
-    the system includes a simple event system and fires some event,
+    The system includes a simple event system and fires some events internal,
     here are their signatures:
 
-    'plugin_found' : (path, plugin)
-        path : the full path to the folder containing the plugin
-        plugin : plugin version string (ie 'plugin_name:version')
+    'plugin_found': (path, plugin)
+        path (str): the full path to the folder containing the plugin
 
-    'plugin_loaded' : (plugin, plugin_required, component_needed)
-        plugin : plugin version string (ie 'plugin_name:version')
-        plugin_required: version string of the plugin that required the
-            loaded plugin (version string ie 'plugin_name:version')
-        component_needed: the name of the component needed by the
-            requesting plugin
+        plugin (str): plugin version string (ie 'plugin_name:version')
 
-    'component_loaded' : (component, plugin_required, plugin_loaded)
-        component : the name of the component loaded
-        plugin_required : version string of the plugin that required the
-            loaded component (version string ie 'plugin_name:version')
-            (might be None)
-        plugin_loaded : version string of the plugin that the component was
-            loaded from (version string ie 'plugin_name:version')
+    'plugin_loaded': (plugin, plugin_required, component_needed)
+        plugin (str): plugin version string (ie 'plugin_name:version')
+
+        plugin_required (str): version string of the plugin that required the
+        loaded plugin (version string ie 'plugin_name:version')
+
+        component_needed (str): the name of the component needed by the
+        requesting plugin
+
+    'component_loaded': (component, plugin_required, plugin_loaded)
+        component (str): the name of the component loaded
+
+        plugin_required (str, None): version string of the plugin that
+        required the loaded component
+        (version string ie 'plugin_name:version')
+        (might be None)
+
+        plugin_loaded (str): version string of the plugin that the component
+        was loaded from (version string ie 'plugin_name:version')
 
     Pyitect keeps track of all the instances of the System class in
     `System.systems` which is a map of object id's to instances of System.
 
+    Attributes:
+
+        config (dict): A mapping of component names to version requirements
+        plugins (dict): A mapping of the plugins the system knows about.
+            Maps names to `dicts` of :class:`Version` s mapped to
+            :class:`Plugin` config objects
+
+        components (dict): A mapping of :func:`Component.key` s to
+            loaded component objects
+
+        component_map (dict): A mapping of components the system knows about.
+            Maps names to `dicts` of :class:`Version` s mapped to
+            :class:`Component` config objects
+
+        loaded_plugins (dict): A mapping of :func:`Plugin.key` s to
+            loaded plugin module objects
+
+        enabled_plugins (list): A list of :func:`Plugin.key` s of
+            enabled plugins
+
+        using (list): A List of :func:`Component.key` s loaded by the system
+
+        events (dict): A mapping of event names to lists of callable objects
+
     """
+
     systems = []
+    """A list of all :class:`System` instances"""
 
     def __init__(self, config, enable_yaml=False):
-        """
-        set up the system and load a configuration that may spesify plugins
-        and versions to use for spesifc components
-        plugins can define their own requerments but they are superceeded by
-        the system configuration (carefull you can break it)
+        """Setup the system and load a configuration
+
+        that may spesify plugins and versions to use for spesifc components
+        plugins can define their own requerments the system configuration
+        acts as a default (carefull you can break it)
+
+        Args:
+            config (dict): A mapping of component names to version requirements
+            enable_yaml (bool): Should the system support yaml config files?
         """
         global _have_yaml
 
@@ -323,34 +409,55 @@ class System(object):
         System.systems.append(self)
 
     def bind_event(self, event, function):
-        """
+        """Bind a callable object to the event name
+
         a simple event system bound to the plugin system,
         bind a function on an event and when the event is fired
-        all bound functionsare called with args and kwargs
+        all bound functions are called with the `*args` and `**kwargs`
         passed to the fire call
+
+        Args:
+            event (str): name of event to bind to
+            function (callable): Boject to be called when event fires
         """
         if event not in self.events:
             self.events[event] = []
         self.events[event].append(function)
 
     def unbind_event(self, event, function):
-        """
-        remove a function from the event
+        """Remove a function from an event
+
+        removes the function object from the list of callables
+        to call when event fires. does nothing if function is not bound
+
+        Args:
+            event (str): name of event bound to
+            function (callable): object to unbind
         """
         if event in self.events:
             self.events[event].remove(function)
 
     def fire_event(self, event, *args, **kwargs):
-        """
-        fire all functions bound to the event name and pass all
-        extra args and kwargs to the function
+        """Call all functions bound to the event name
+
+        and pass all extra `*args` and `**kwargs` to the bound functions
+
+        Args:
+            event (str): name of event to fire
         """
         if event in self.events:
             for function in self.events[event]:
                 function(*args, **kwargs)
 
     def iter_component_subtypes(self, component):
+        """An iterater function to interate all known subtypes of a component
 
+        Takes a conponent name and yeilds all known conponent names that
+        are subtypes not including the conponent name
+
+        Args:
+            conponent (str): the conponent name to act as a base
+        """
         if isinstance(component, Component):
             component = component.name
         if not isinstance(component, basestring):
@@ -363,6 +470,25 @@ class System(object):
                 yield key
 
     def iter_component_providers(self, comp, subs=False, vers=False, reqs="*"):
+        """An iterater function to interate providers of a component
+
+        Takes a conponent name and yeilds providers of the conponent
+
+        if `subs` is `True` yeilds providers of subtypes too
+
+        if `vers` is `True` yeilds all version of the provider
+        not just the highest
+
+        `reqs` is a version requirement for the providers to meet.
+        Defaults to any version
+
+        Args:
+            comp (str): component name to use as a base
+            subs (bool): should subtypes be yeilded too?
+            vers (bool): should all version be yeilded not just the highest?
+            reqs (str, list, tuple): version spec string or list there of
+            all items are passed to a :class:`Spec`
+        """
         if isinstance(reqs, basestring):
             reqs = (reqs,)
         if not isinstance(reqs, (list, tuple)):
@@ -393,10 +519,6 @@ class System(object):
                         yield (com, prov, spec.select(versions))
 
     def _enable_plugin(self, plugin):
-        """
-        takes a plugins metadata and remembers it's provided components so
-        the system is awear of them
-        """
         # loop through and map component names to a listing of plugin names and
         # versions
 
@@ -453,8 +575,15 @@ class System(object):
         return on_enables
 
     def enable_plugins(self, *plugins):
-        """
-        enables one or more plugins
+        """Take one or more `Plugin` s and map it's components
+
+        Takes a plugins metadata and remembers it's provided components so
+        the system is awear of them
+
+        Args:
+            plugins (plugins): One or more plugins to enable.
+            Each argument can it self be a list or map of :class:`Plugin`
+            objects or a plain :class:`Plugin` object
         """
         if len(plugins) == 1:
             plugins = plugins[0]
@@ -496,7 +625,7 @@ class System(object):
         with open(path) as cfgfile:
             if (is_yaml and self._yaml):
                 try:
-                    cfg = yaml.load(cfgfile)
+                    cfg = yaml.safe_load(cfgfile)
                 except Exception as err:
                     message = (
                         str(err) +
@@ -517,8 +646,10 @@ class System(object):
         return cfg
 
     def add_plugin(self, path):
-        """
-        adds a plugin form the provided path
+        """Adds a plugin form the provided path
+
+        Args:
+            path (str): path to a plugin folder
         """
         exts = (".yml", ".yaml", ".json")
         yamls = (".yml", ".yaml")
@@ -554,8 +685,12 @@ class System(object):
             raise RuntimeError("No plugin exists at %s" % (path,))
 
     def is_plugin(self, path):
-        """
-        returns true if there is a plugin in the folder pointed to by path
+        """Test a path to see if it is a `Plugin`
+
+        Args:
+            path (str): path to test
+
+        Returns: true if there is a plugin in the folder pointed to by path
         """
         # a plugin exists if a file with the same name as the folder + the
         # .json (or .yml/.yaml if yaml is enabled)
@@ -592,9 +727,11 @@ class System(object):
                         paths.append(file)
 
     def search(self, path):
-        """
-        search a path (dir or file) for a plugin, in the case of a file it
-        searches the containing dir.
+        """Search a path (dir or file) for a plugin
+        in the case of a file it searches the containing dir.
+
+        Args:
+            path (str): the path to search
         """
         # we either have a folder or a file,
         # if it's a file is there a plugin in the folder containing it?
@@ -659,7 +796,8 @@ class System(object):
 
         return plugin, highest_valid
 
-    def _load_component(self, component, plugin, version, request=None):
+    def _load_component(self, component, plugin,
+                        version, requires=None, request=None):
 
         # be sure not to load things twice, but besure the components is loaded
         # and saved
@@ -693,7 +831,8 @@ class System(object):
         if key not in self.components:
 
             plugin_obj = self.load_plugin(
-                plugin, version, request=request, comp=component)
+                plugin, version,
+                requires=requires, request=request, comp=component)
 
             obj = plugin_obj
             parts = comp.path.split(".")
@@ -719,11 +858,31 @@ class System(object):
 
         return self.components[key]
 
-    def load_plugin(self, plugin, version, request=None, comp=None):
-        """
-        takes a plugin name and version and finds the stored Plugin object
+    def load_plugin(self, plugin, version,
+                    requires=None, request=None, comp=None):
+        """Takes a plugin name and version and loads it's module
+
+        finds the stored Plugin object
         takes a Plugin object and loads the module
         recursively loading declared dependencies
+
+        Args:
+            plugin (str): plugin name
+
+            version (str, Version): version to load
+
+            requires (dict, None): a mapping of component names
+            to version requierments to use during the load
+
+            request (str, None): name of the version string of the plugin
+            that requested a component from this plugin.
+            `None` if not requested.
+
+            comp (str): name of the component needed by teh requesting plugin.
+            `None` if not requested.
+
+        Returns:
+            the loaded module object
         """
         # we dont want to load a plugin twice just becasue it provides more
         # than one component, save previouly loaded plugins
@@ -755,6 +914,7 @@ class System(object):
                     obj = self.load(
                         req_name,
                         cfg.consumes,
+                        requires=requires,
                         request=cfg.get_version_string()
                         )
                 except Exception as err:
@@ -782,13 +942,29 @@ class System(object):
         return plugin_obj
 
     def load(self, component, requires=None, request=None, bypass=False):
-        """
+        """Load and return a component object
+
         processes loading and returns the component by name,
         chain loading any required plugins to obtain dependencies.
         Uses the config that was provided on system creation
         to load correct versions, if there is a conflict throws
         a run time error.
         bypass lets the call bypass the system configuration
+
+        Args:
+            component (str): name of component to load
+
+            requires (dict, None): a mapping of component names
+            to version requierments to use during the load
+
+            request (str, None): the name of the requesting plugin.
+            `None` if not requested
+
+            bypass (bool): ignore the system configured version requierments
+
+        Returns:
+            the loaded component object
+
         """
         # set default requirements
         plugin = version = plugin_req = ""
@@ -815,14 +991,29 @@ class System(object):
         plugin, version = self.resolve_highest_match(
             component, plugin_req, version_spec)
 
-        comp_obj = self._load_component(component, plugin, version)
+        comp_obj = self._load_component(
+            component, plugin, version, requires=reqs)
 
         return comp_obj
 
     def get_plugin_module(self, plugin, version=None):
-        """
+        """Fetch the loaded plugin module
+
+        if `version` is None
         searches for the highest version number plugin with it's module loaded
-        if it can't find  it it raises a runtime error
+        if it can't find anything it raises a runtime error
+
+        Args:
+            plugin (str): name of plugin to find
+            version (None, str, Version): if provided load a spesfic version
+
+        Returns:
+            loaded module object
+
+        Raises:
+            TypeError: if provideing a version that is not either a `str` or
+            a :class:`Version`
+            RuntimeError: if the Plugin can't be found or is not loaded yet
         """
         if version:
             if isinstance(version, basestring):
@@ -912,11 +1103,13 @@ def expand_version_req(requires):
 
 
 def gen_version(version_str):
-    """
-    generates an internally used version tuple
-    generates a 2 tuple
-    preserving the original version string in the first position
-    a parsed version in the second
+    """Generates an :class:`Version` object
+
+    takes a SemVer string and returns a :class:`Version`
+    if not a proper SemVer string it coerces it
+
+    Args:
+        version_str (str): version string to use
     """
     try:
         ver = Version(version_str)
@@ -926,6 +1119,18 @@ def gen_version(version_str):
 
 
 def get_unique_name(*parts):
+    """Generate a fixed lenght unique name from parts
+
+    takes the parts turns them into strings and uses them in a sha1 hash
+
+    used internaly to ensure module object for plugins have unique names
+    like so
+
+    `get_unique_name(plugin.author, plugin.get_version_string())`
+
+    Returns:
+        str: name hash
+    """
     def _str_encode(obj):
         # ensure bytes is there in Python2
         if PY2:

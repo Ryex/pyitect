@@ -13,13 +13,18 @@ Pyitect
 A `architect <https://github.com/c9/architect>`_ inspired plugin
 framework for Python 3 and Python >= 2.6
 
+A simple Framework that Provides the facility to load Component form plugins.
+
+Also binds a simple event system to bind functions to events on the system.
+
 Contents:
 
 .. toctree::
    :maxdepth: 4
 
    pyitect
-   plugin
+   plugins
+   system
    changelog
 
 

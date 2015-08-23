@@ -4,6 +4,7 @@ Pyitect is a pluginframe work
 
 __version__ = "1.1.0"
 
+from semantic_version import Version, Spec
 from .pyitect import System
 from .pyitect import Plugin
 from .pyitect import Component
