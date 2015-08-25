@@ -84,6 +84,17 @@ A plugin system can not be created without first creating an
 instance of the System class.
 
 
+Global System
+--------------
+
+If you dont want to manage your plugin system instance yourself
+it is possible to have the pyitect module manage your plugin system for you.
+Simply use the :func:`pyitect.build_system` function to construct your
+plugin system inside pyitect. To later fetch your plugin system instance use
+:func:`pyitect.get_system`. To clean up and remove the existing system use
+:func:`pyitect.destroy_system`.
+
+
 'on_enable' Property
 --------------------
 
@@ -93,6 +104,13 @@ that is is executed right after a plugin is enabled and
 its components have been mapped. This allows for special cases where enabling
 a plugin requires more than just making it's components available
 to be imported. For example is there is some system setup to be done.
+
+::
+    pyitect.build_system(config, enable_yaml=False)
+    system = pyitect.get_system()
+    # ... do stuff
+    # end program / need fresh system?
+    pyitect.destroy_system()
 
 
 Loading Plugins
