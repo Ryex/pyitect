@@ -37,6 +37,49 @@ except ImportError:
 _system = None
 
 
+def get_system():
+    """Fetch the global system instance
+
+    Raises:
+        PyitectError: If the system isn't built yet
+    """
+    global _system
+    if _system:
+        return _system
+    else:
+        raise PyitectError("Global system instance not built yet")
+
+
+def build_system(config, enable_yaml=False):
+    """Build a global system instance
+
+    Args:
+        config (dict): A mapping of component names to version requirements
+        enable_yaml (bool): Should the system support yaml config files?
+
+    Raises:
+        PyitectError: if the system is already built
+    """
+    global _system
+    if _system:
+        raise PyitectError("Global system instance already exists")
+    _system = System(config, enable_yaml)
+    return _system
+
+
+def destroy_system():
+    """destroy the global system instance
+
+    does nothing if the system isn't built
+    """
+    global _system
+    if _system:
+        global _system
+        del _system
+        global _system
+        _system = None
+
+
 class Plugin(object):
 
     """An object that can hold the metadata for a plugin

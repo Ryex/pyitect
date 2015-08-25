@@ -22,16 +22,19 @@ componentLoadTriggered = None
 
 def setup():
     # setup a plugin system
-    global system
     global folder_path
 
     cfgfile = open(os.path.join(folder_path, "config.json"))
     cfg = json.load(cfgfile)
-    system = pyitect.System(cfg, enable_yaml=True)
+    pyitect.build_system(cfg, enable_yaml=True)
+
+
+def teardown():
+    pyitect.destroy_system()
 
 
 def test_01_bind_events():
-    global system
+    system = pyitect.get_system()
     tools.ok_(not system.events)
 
     def onPluginFound(path, plugin):
@@ -85,7 +88,7 @@ def test_01_bind_events():
 
 
 def test_02_search_plugins():
-    global system
+    system = pyitect.get_system()
     global folder_path
 
     tools.ok_(not system.plugins)
@@ -96,7 +99,7 @@ def test_02_search_plugins():
 
 
 def test_03_enable_plugins():
-    global system
+    system = pyitect.get_system()
 
     tools.ok_(not system.components)
     tools.ok_(not system.enabled_plugins)
@@ -119,7 +122,7 @@ def test_03_enable_plugins():
 
 
 def test_04_filter_plugins():
-    global system
+    system = pyitect.get_system()
     tools.ok_("bad_plugin" in system.plugins)
     tools.ok_("bad_plugin" not in system.enabled_plugins)
 
@@ -127,7 +130,7 @@ def test_04_filter_plugins():
 def test_05_fail_to_load_filtered():
 
     def load_component(name):
-        global system
+        system = pyitect.get_system()
         return system.load(name)
 
     tools.assert_raises(
@@ -137,28 +140,28 @@ def test_05_fail_to_load_filtered():
 
 
 def test_06_provide_foo():
-    global system
+    system = pyitect.get_system()
     foo = system.load("foo")
     tools.ok_(inspect.isfunction(foo))
     tools.eq_(foo(), "foo")
 
 
 def test_07_provide_foov2():
-    global system
+    system = pyitect.get_system()
     foo = system.load("foo", {"foo": "provide_plugin:==2.0.0"})
     tools.ok_(inspect.isfunction(foo))
     tools.eq_(foo(), "foo2")
 
 
 def test_08_consume_foo():
-    global system
+    system = pyitect.get_system()
     foobar = system.load("foobar")
     tools.ok_(inspect.isfunction(foobar))
     tools.eq_(foobar(), "foobar")
 
 
 def test_09_components_subtypes():
-    global system
+    system = pyitect.get_system()
     versions = []
     components = []
 
@@ -182,7 +185,7 @@ def test_09_components_subtypes():
 
 
 def test_10_relative_import():
-    global system
+    system = pyitect.get_system()
     TestClass = system.load("TestClass")
     tools.ok_(inspect.isclass(TestClass))
     T = TestClass("testmessage")
@@ -190,7 +193,7 @@ def test_10_relative_import():
 
 
 def test_11_fetch_plugin_module():
-    global system
+    system = pyitect.get_system()
     module = system.get_plugin_module("provide_plugin")
     tools.ok_(inspect.ismodule(module))
 
@@ -201,7 +204,7 @@ def test_12_on_enable_plugin():
 
 
 def test_13_yaml_plugin():
-    global system
+    system = pyitect.get_system()
     foo_yaml = system.load("foo_yaml")
     tools.eq_(foo_yaml("testmessage"), "testmessageyaml")
 
@@ -217,7 +220,7 @@ def test_14_events_fired():
 
 
 def test_15_unique_module_names():
-    global system
+    system = pyitect.get_system()
 
     TestClass = system.load("TestClass")
 
@@ -227,10 +230,9 @@ def test_15_unique_module_names():
 
 
 def test_16_bad_plugin_fails():
-    global system
 
     def enable_plugin():
-        global system
+        system = pyitect.get_system()
         system.load_plugin("bad_plugin", "0.0.1")
 
     tools.assert_raises(
@@ -247,3 +249,4 @@ if __name__ == "__main__":
     for test in sorted(tests):
         print("Calling %s:" % (test,))
         names[test]()
+    teardown()
