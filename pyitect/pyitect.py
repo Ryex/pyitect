@@ -1,8 +1,9 @@
 from __future__ import (print_function)
 
 import sys
-
 import os
+import traceback
+import re
 
 PY_VER = sys.version_info[:2]
 PY2 = PY_VER[0] == 2
@@ -32,6 +33,8 @@ try:
     _have_yaml = True
 except ImportError:
     pass
+
+_system = None
 
 
 class Plugin(object):
@@ -75,44 +78,47 @@ class Plugin(object):
             self.name = config['name'].strip()
         else:
             raise ValueError(
-                "Plugin as '%s' does not have a name string" % path)
+                "Plugin as '%s' does not have a name string" % (path,))
         if 'author' in config and isinstance(config['author'], basestring):
             self.author = config['author'].strip()
         else:
             raise ValueError(
-                "Plugin as '%s' does not have a author string" % path)
+                "Plugin as '%s' does not have a author string" % (path,))
         if 'version' in config:
             # store both the original version string and a parsed version that
             # can be compaired accurately
             self.version = gen_version(config['version'].strip())
         else:
-            raise ValueError("Plugin at '%s' does not have a version" % path)
+            raise ValueError(
+                "Plugin at '%s' does not have a version"
+                % (path,))
         if 'file' in config:
             self.file = config['file'].strip()
         else:
             raise ValueError(
-                "Plugin as '%s' does not have a plugin file spesified" % path)
+                "Plugin as '%s' does not have a plugin file spesified"
+                % (path,))
         if (('consumes' in config) and
                 isinstance(config['consumes'], collections.Mapping)):
             self.consumes = config['consumes']
         else:
             raise ValueError(
                 "Plugin at '%s' has no map of consumed "
-                "components to plugin versions" % path)
+                "components to plugin versions" % (path,))
         if (('provides' in config) and
                 isinstance(config['provides'], collections.Mapping)):
             self.provides = config['provides']
         else:
             raise ValueError(
                 "Plugin at '%s' hs no map of provided components"
-                " to version postfixes" % path)
+                " to version postfixes" % (path,))
         if 'on_enable' in config:
             if isinstance(config['on_enable'], basestring):
                 self.on_enable = config['on_enable']
             else:
                 raise ValueError(
                     "Plugin at '%s' has a 'on_enable' that is not a string"
-                    % path)
+                    % (path,))
         else:
             self.on_enable = None
         self.path = path
@@ -141,11 +147,10 @@ class Plugin(object):
                 plugin = spec.loader.load_module()
                 sys.path.remove(self.path)
             except Exception as err:
-                message = (
-                    str(err) + "\nPlugin '%s' at '%s' failed to load"
-                    % (self.name, self.path))
-                err.strerror = message
-                raise err
+                raise PyitectLoadError(
+                    "Plugin '%s' at '%s' failed to load"
+                    % (self.name, self.path),
+                    cause=err)
         else:
             name = os.path.splitext(os.path.basename(self.file))[0]
             search_path = self.path
@@ -158,26 +163,29 @@ class Plugin(object):
                 try:
                     plugin = imp.load_module(module_name, f, pathn, desc)
                 except Exception as err:
-                    message = (
-                        str(err) + "\nPlugin '%s' at '%s' failed to load"
-                        % (self.name, self.path))
-                    err.strerror = message
-                    raise err
+                    raise PyitectLoadError(
+                        "Plugin '%s' at '%s' failed to load"
+                        % (self.name, self.path),
+                        cause=err)
                 finally:
                     if f:
                         f.close()
                 sys.path.remove(search_path)
             except Exception as err:
-                message = (
-                    str(err) + "\nPlugin '%s' at '%s' failed to load"
-                    % (self.name, self.path))
-                err.strerror = message
-                raise err
+                raise PyitectLoadError(
+                    "Plugin '%s' at '%s' failed to load"
+                    % (self.name, self.path),
+                    cause=err)
 
         return plugin
 
     def load(self):
-        """loads the plugin file and returns the resulting module"""
+        """loads the plugin file and returns the resulting module
+
+        Raises:
+            PyitectLoadError: If there was a problem loading a plugin module
+            PyitectNotProvidedError: If component is not provided
+        """
         if self.module is None:
             plugin = self._load()
             self.module = plugin
@@ -188,42 +196,56 @@ class Plugin(object):
         return self.name + ":" + str(self.version)
 
     def run_on_enable(self):
-        """runs the function in the 'on_enable' if set"""
+        """runs the function in the 'on_enable' if set
+
+        Raises:
+            TypeError: if the on_enable property is set wrong
+
+            PyitectOnEnableError: if there is an exception
+            acessing or calling the on_enable function
+
+            PyitectLoadError: If the module object is not loaded yet
+        """
         if self.on_enable:
-            parts = self.on_enable.split(".")
-            if len(parts) < 1:
-                raise RuntimeError(
-                    "Plugin '%s' at '%s' has an invalid object path "
+
+            if not isinstance(self.on_enable, basestring):
+                raise TypeError(
+                    "Plugin '%s' at '%s': invalid object path "
                     "in its on_enable"
-                    % (self.name, self.path)
-                    )
+                    % (self.name, self.path))
+            parts = self.on_enable.split(".")
             if self.module is None:
-                raise RuntimeError(
-                    "Plugin '%s' at '%s' has no module object and is not "
+                raise PyitectLoadError(
+                    "Plugin '%s' at '%s': has no module object and is not "
                     "loaded yet. can not attempt to find on_enable function"
-                    % (self.name, self.path)
-                    )
+                    % (self.name, self.path))
             obj = self.module
             try:
                 for part in parts:
                     obj = getattr(obj, part)
             except Exception as err:
-                message = (
-                    str(err) + "\nPlugin '%s' at '%s' "
-                    "can not access 'on_enable' path '%s'"
-                    % (self.name, self.path, self.on_enable))
-                err.strerror = message
-                raise err
+                raise PyitectOnEnableError(
+                    "Plugin '%s' at '%s': cann't access 'on_enable' path '%s'"
+                    % (self.name, self.path, self.on_enable,),
+                    cause=err)
 
             if not callable(obj):
-                message = (
-                    str(err) + "\nPlugin '%s' at '%s' "
-                    "can not call 'on_enable' path '%s', not callable"
-                    % (self.name, self.path, self.on_enable))
-                err.strerror = message
-                raise err
-
-            obj(self)
+                raise PyitectOnEnableError(
+                    "Plugin '%s' at '%s': can not call 'on_enable', "
+                    "Path '%s', not callable"
+                    % (self.name, self.path, self.on_enable,),
+                    cause=err)
+            try:
+                obj(self)
+            except Exception as err:
+                raise PyitectOnEnableError(
+                    "Plugin '%s' at '%s': Exception during 'on_enable' call"
+                    % (self.name, self.path),
+                    cause=err)
+        else:
+            raise TypeError(
+                "Plugin '%s' at '%s': has no on_enable"
+                % (self.name, self.path))
 
     def has_on_enable(self):
         """returns `True` if it has an `on_enable` attribute that's not None"""
@@ -389,7 +411,7 @@ class System(object):
         global _have_yaml
 
         if not isinstance(config, collections.Mapping):
-            raise RuntimeError(
+            raise PyitectError(
                 "System configurations must be mappings of component "
                 "names to 'plugin:version' strings")
 
@@ -457,11 +479,15 @@ class System(object):
 
         Args:
             conponent (str): the conponent name to act as a base
+
+        Raises:
+            TypeError: if ``component` is niether a
+            :class:`Component` instance nor a string
         """
         if isinstance(component, Component):
             component = component.name
         if not isinstance(component, basestring):
-            raise ValueError(
+            raise TypeError(
                 "%r  object is niether a Component instance nor a string"
                 % (component,))
 
@@ -488,15 +514,17 @@ class System(object):
             vers (bool): should all version be yeilded not just the highest?
             reqs (str, list, tuple): version spec string or list there of
             all items are passed to a `Spec`
+        Raises:
+            TypeError: if `comp` or `reqs` are passed wrong
         """
         if isinstance(reqs, basestring):
             reqs = (reqs,)
         if not isinstance(reqs, (list, tuple)):
-            raise ValueError(
+            raise TypeError(
                 "Invalid requierment type, must be string, list, or tuple: %r"
                 % (reqs,))
         if not isinstance(comp, basestring):
-            raise ValueError(
+            raise TypeError(
                 "comp is niether a Component instance nor a string: %r"
                 % (comp,))
 
@@ -535,7 +563,7 @@ class System(object):
             if plugin.name not in self.component_map[name]:
                 self.component_map[name][plugin.name] = {}
             if plugin.version in self.component_map[name][plugin.name]:
-                raise RuntimeError(
+                raise PyitectDupError(
                     "Duplicate component %s provided by plugin %s@%s"
                     % (name, plugin.name, plugin.version))
 
@@ -556,8 +584,7 @@ class System(object):
         for k in plugins:
             plugin = plugins[k]
             if not isinstance(plugin, Plugin):
-                raise RuntimeError(
-                    "'%r' is not a plugin" % str(plugin))
+                raise PyitectError("'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                 on_enables.append(plugin)
             self._enable_plugin(plugin)
@@ -567,8 +594,7 @@ class System(object):
         on_enables = []
         for plugin in plugins:
             if not isinstance(plugin, Plugin):
-                raise RuntimeError(
-                    "'%r' is not a plugin" % str(plugin))
+                raise PyitectError("'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                 on_enables.append(plugin)
             self._enable_plugin(plugin)
@@ -584,6 +610,17 @@ class System(object):
             plugins (plugins): One or more plugins to enable.
             Each argument can it self be a list or map of :class:`Plugin`
             objects or a plain :class:`Plugin` object
+
+        Raises:
+            TypeError: If you try to pass a non :class:`Plugin` object
+
+            PyitectDubError: If you try to enable a plugin
+            that provides duplicate conponent
+
+            PyitectOnEnableError: If There was an error in the on_enable
+
+            PyitectLoadError: If there was an error loading a plugin
+            to call it's on_enable
         """
         if len(plugins) == 1:
             plugins = plugins[0]
@@ -598,7 +635,7 @@ class System(object):
             # single plugin
             plugin = plugins
             if not isinstance(plugin, Plugin):
-                raise RuntimeError("'%r' is not a plugin" % str(plugin))
+                raise TypeError("'%r' is not a plugin" % str(plugin))
             if plugin.has_on_enable():
                     on_enables.append(plugin)
             self._enable_plugin(plugin)
@@ -627,22 +664,18 @@ class System(object):
                 try:
                     cfg = yaml.safe_load(cfgfile)
                 except Exception as err:
-                    message = (
-                        str(err) +
-                        "\nCould not parse plugin yaml file at %s"
-                        % (path,))
-                    err.strerror = message
-                    raise err
+                    raise PyitectError(
+                        "Could not parse plugin YAML config file at %s"
+                        % (path,),
+                        cause=err)
             else:
                 try:
                     cfg = json.load(cfgfile)
                 except Exception as err:
-                    message = (
-                        str(err) +
-                        "\nCould not parse plugin json file at %s"
-                        % (path,))
-                    err.strerror = message
-                    raise err
+                    raise PyitectError(
+                        "Could not parse plugin JSON config file at %s"
+                        % (path,),
+                        cause=err)
         return cfg
 
     def add_plugin(self, path):
@@ -650,6 +683,10 @@ class System(object):
 
         Args:
             path (str): path to a plugin folder
+
+        Rasies:
+            PyitectError: If no plugin exists at path
+            PyitectDupError: if you try to add the same plugin twice
         """
         exts = (".yml", ".yaml", ".json")
         yamls = (".yml", ".yaml")
@@ -674,7 +711,7 @@ class System(object):
                 self.plugins[name] = {}
 
             if version in self.plugins[name]:
-                raise RuntimeError(
+                raise PyitectDupError(
                     "Duplicate plugin %s@%s at '%s'"
                     % (name, version, path))
 
@@ -682,7 +719,7 @@ class System(object):
             self.fire_event('plugin_found', path, plugin.get_version_string())
 
         else:
-            raise RuntimeError("No plugin exists at %s" % (path,))
+            raise PyitectError("No plugin exists at %s" % (path,))
 
     def is_plugin(self, path):
         """Test a path to see if it is a `Plugin`
@@ -771,9 +808,9 @@ class System(object):
                 "got: %r" % (spec,))
 
         if component not in self.component_map:
-            raise RuntimeError(
-                "Component '%s' is not provided by any plugin"
-                % (component,))
+            raise PyitectNotProvidedError(
+                "Component '%s' is not provided by any plugin",
+                component)
 
         # if we've failed to give a requierment for somthing fill it ourselves
         if plugin == "":
@@ -782,7 +819,7 @@ class System(object):
             plugin = sorted(list(self.component_map[component].keys()))[0]
 
         if plugin not in self.component_map[component]:
-            raise RuntimeError(
+            raise PyitectError(
                 "Component '%s' is not provided by plugin '%s'"
                 % (component, plugin))
 
@@ -790,9 +827,10 @@ class System(object):
         highest_valid = spec.select(versions)
 
         if not highest_valid:
-            raise RuntimeError(
+            raise PyitectNotMetError(
                 "Component '%s' does not have any providers that meet "
-                "requirements" % component)
+                "requirements"
+                % (component,))
 
         return plugin, highest_valid
 
@@ -816,12 +854,12 @@ class System(object):
                 "Version must be a SemVer Version, "
                 "got: %r" % (version,))
         if component not in self.component_map:
-            raise RuntimeError(
+            raise PyitectNotProvidedError(
                 "Component '%s' is not provided by any plugin"
                 % (component,))
         if (plugin not in self.component_map[component]
                 or version not in self.component_map[component][plugin]):
-            raise RuntimeError(
+            raise PyitectNotProvidedError(
                 "Component '%s' is not provided by plugin '%s@%s'"
                 % (component, plugin, version))
 
@@ -838,7 +876,7 @@ class System(object):
             parts = comp.path.split(".")
             for part in parts:
                 if not hasattr(obj, part):
-                    raise RuntimeError(
+                    raise PyitectNotProvidedError(
                         "Plugin '%s:%s' does not have name '%s'"
                         % (plugin, version, comp.path))
                 obj = getattr(obj, part)
@@ -857,6 +895,54 @@ class System(object):
                 )
 
         return self.components[key]
+
+    def _load_plugin_obj(self, plugin, version,
+                         requires=None, request=None, comp=None):
+        """Loads but does not return a plugin module"""
+        plugin_key = (plugin, version)
+        if (plugin not in self.plugins
+                or version not in self.plugins[plugin]):
+            raise PyitectError(
+                "System has no plugin '%s' at version '%s'"
+                % (plugin, version))
+        cfg = self.plugins[plugin][version]
+        # collect the imports namespace object
+        imports = sys.modules[__name__.split('.')[0]].imports
+        # loop through the consumed component names
+        # load them and add them to the imports namespace
+        reqs = {}
+        reqs.update(cfg.consumes)
+        if requires:
+            reqs.update(requires)
+        for req_name in cfg.consumes.keys():
+            obj = None
+            try:
+                obj = self.load(
+                    req_name,
+                    requires=reqs,
+                    request=cfg.get_version_string()
+                    )
+            except Exception as err:
+                raise PyitectLoadError(
+                    "Could not load required component "
+                    "'%s' for plugin '%s@%s'"
+                    % (req_name, plugin, version,),
+                    cause=err)
+
+            setattr(imports, req_name, obj)
+
+        # load the plugin
+        self.loaded_plugins[plugin_key] = cfg.load()
+
+        # cleanup the imports namespace
+        for req_name in cfg.consumes.keys():
+            delattr(imports, req_name)
+        self.fire_event(
+            'plugin_loaded',
+            cfg.get_version_string(),
+            request,
+            comp
+            )
 
     def load_plugin(self, plugin, version,
                     requires=None, request=None, comp=None):
@@ -883,6 +969,10 @@ class System(object):
 
         Returns:
             the loaded module object
+
+        Raises:
+            TypeError: if things get passed worng
+            PyitectLoadError: if there is an exception during the load
         """
         # we dont want to load a plugin twice just becasue it provides more
         # than one component, save previouly loaded plugins
@@ -898,50 +988,7 @@ class System(object):
                 "got: %r" % (version,))
         plugin_key = (plugin, version)
         if plugin_key not in self.loaded_plugins:
-            if (plugin not in self.plugins
-                    or version not in self.plugins[plugin]):
-                raise RuntimeError(
-                    "System has no plugin '%s' at version '%s'"
-                    % (plugin, version))
-            cfg = self.plugins[plugin][version]
-            # collect the imports namespace object
-            imports = sys.modules[__name__.split('.')[0]].imports
-            # loop through the consumed component names
-            # load them and add them to the imports namespace
-            reqs = {}
-            reqs.update(cfg.consumes)
-            if requires:
-                print(requires)
-                reqs.update(requires)
-            for req_name in cfg.consumes.keys():
-                obj = None
-                try:
-                    obj = self.load(
-                        req_name,
-                        requires=reqs,
-                        request=cfg.get_version_string()
-                        )
-                except Exception as err:
-                    message = (
-                        str(err) + "\nCould not load required component "
-                        "'%s' for plugin '%s@%s'"
-                        % (req_name, plugin, version))
-                    err.strerror = message
-                    raise err
-                setattr(imports, req_name, obj)
-
-            # load the plugin
-            self.loaded_plugins[plugin_key] = cfg.load()
-
-            # cleanup the imports namespace
-            for req_name in cfg.consumes.keys():
-                delattr(imports, req_name)
-            self.fire_event(
-                'plugin_loaded',
-                cfg.get_version_string(),
-                request,
-                comp
-                )
+            self._load_plugin_obj(plugin, version, requires, request, comp)
         plugin_obj = self.loaded_plugins[plugin_key]
         return plugin_obj
 
@@ -969,14 +1016,17 @@ class System(object):
         Returns:
             the loaded component object
 
+        Raises:
+            TypeError: if thigns get passed worng
+            PyitectLoadError: if there is an exception druing load
         """
         # set default requirements
         plugin = version = plugin_req = ""
         version_spec = Spec("*")
         if component not in self.component_map:
-            raise RuntimeError(
+            raise PyitectNotProvidedError(
                 "Component '%s' not provided by any enabled plugins"
-                % component)
+                % (component,))
 
         # merge the systems config and the passed plugin requirements (if they
         # were passed) to get the most relavent requirements
@@ -1017,7 +1067,8 @@ class System(object):
         Raises:
             TypeError: if provideing a version that is not either a `str` or
             a :class:`Version`
-            RuntimeError: if the Plugin can't be found or is not loaded yet
+            PyitectError: if the Plugin can't be found
+            PyitectLoadError: plugin module is not loaded yet
         """
         if version:
             if isinstance(version, basestring):
@@ -1034,11 +1085,11 @@ class System(object):
             if plugin_key in self.loaded_plugins:
                 return self.loaded_plugins[plugin_key]
             else:
-                raise RuntimeError(
+                raise PyitectLoadError(
                     "Version '%s' of plugin '%s' not yet loaded"
                     % (version, plugin))
         else:
-            raise RuntimeError("Plugin '%s' not found" % plugin)
+            raise PyitectError("Plugin '%s' not found" % (plugin,))
 
 
 def expand_version_req(requires):
@@ -1179,3 +1230,100 @@ def issubcomponent(comp1, comp2):
         return False
 
     return True
+
+
+class PyitectError(Exception):
+    """ Wraps Exceptions for Chained trace backs
+
+    As Pyitect is intended for use across pyhton 2 and 3 a way was needed to
+    Ensure that exceptions caused during the import of plugin modules tell
+    *why* that import failed insed of just `failed to import 'bla'`
+
+    This code is a modifed version of a `CausedException` class posed to
+    ActiveState back in Sep. 2012 Licensed under MIT license
+
+    the ability handle trees of exceptions was removed
+
+    http://code.activestate.com/recipes/578252-python-exception-chains-or-trees/?in=user-4182236
+    """
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1 and not kwargs and isinstance(args[0], Exception):
+            # we shall just wrap a non-caused exception
+            self.stack = (
+                traceback.format_stack()[:-2] +
+                traceback.format_tb(sys.exc_info()[2]))
+            # ^^^ let's hope the information is still there; caller must take
+            #     care of this.
+            self.wrapped = args[0]
+            self.cause = None
+            super(PyitectError, self).__init__(repr(args[0]))
+            return
+        self.wrapped = None
+        self.stack = traceback.format_stack()[:-1]  # cut off current frame
+        try:
+            cause = kwargs['cause']
+            del kwargs['cause']
+        except:
+            cause = None
+        self.cause = cause
+        super(PyitectError, self).__init__(*args, **kwargs)
+
+    def causeChain(self, indentation='  ', alreadyMentionedTree=[]):
+        yield "Traceback (most recent call last):\n"
+        ellipsed = 0
+        for i, line in enumerate(self.stack):
+            if (ellipsed is not False and i < len(alreadyMentionedTree) and
+                    line == alreadyMentionedTree[i]):
+                ellipsed += 1
+            else:
+                if ellipsed:
+                    yield "  ... (%d frame%s repeated)\n" % (
+                        ellipsed, "" if ellipsed == 1 else "s")
+                    ellipsed = False  # marker for "given out"
+                yield line
+        exc = self if self.wrapped is None else self.wrapped
+        for line in traceback.format_exception_only(exc.__class__, exc):
+            yield line
+        if self.cause:
+            yield "caused by: %s\n" % (self.cause,)
+            for line in self.cause.causeChain(indentation, self.stack):
+                yield re.sub(r'([^\n]*\n)', indentation + r'\1', line)
+
+    def write(self, stream=None, indentation='  '):
+        stream = sys.stderr if stream is None else stream
+        for line in self.causeTree(indentation):
+            stream.write(line)
+
+
+class PyitectNotProvidedError(PyitectError):
+    """Raised if a conponent is not provided"""
+
+    def __init__(self, *args, **kwargs):
+        super(PyitectNotProvidedError, self).__init__(*args, **kwargs)
+
+
+class PyitectNotMetError(PyitectError):
+    """Raised if requierments are not met"""
+
+    def __init__(self, *args, **kwargs):
+        super(PyitectNotMetError, self).__init__(*args, **kwargs)
+
+
+class PyitectLoadError(PyitectError):
+    """Raises if a plugins module is not yet loaded or fais to load"""
+    def __init__(self, *args, **kwargs):
+        super(PyitectLoadError, self).__init__(*args, **kwargs)
+
+
+class PyitectOnEnableError(PyitectError):
+    """Raised if and on_enable call failes"""
+    def __init__(self, *args, **kwargs):
+        super(PyitectOnEnableError, self).__init__(*args, **kwargs)
+
+
+class PyitectDupError(PyitectError):
+    """
+    Raised if you try to add a duplicate plugin or duplicate component provider
+    """
+    def __init__(self, *args, **kwargs):
+        super(PyitectDupError, self).__init__(*args, **kwargs)
