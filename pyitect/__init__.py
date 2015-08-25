@@ -2,7 +2,7 @@
 Pyitect is a pluginframe work
 """
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 from semantic_version import Version, Spec
 

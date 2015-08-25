@@ -166,17 +166,19 @@ def test_09_components_subtypes():
     components = []
 
     subtypes = ("test.test1", "test.test2", "test.test3")
+
     for subtype in system.iter_component_subtypes("test"):
         tools.ok_(subtype in subtypes)
+
     for prov in system.iter_component_providers("test", subs=True):
         comp, plugin, version = prov
-        version_string = comp + ":" + plugin + ":" + version
+        version_string = comp + ":" + plugin + ":" + str(version)
 
         tools.ok_(version_string not in versions)
 
         versions.append(version_string)
 
-        test = system.load(comp)
+        test = system.load_component(comp, plugin, version)
 
         tools.ok_(inspect.isfunction(test))
         tools.ok_(test not in components)
@@ -238,6 +240,33 @@ def test_16_bad_plugin_fails():
     tools.assert_raises(
         pyitect.PyitectLoadError,
         enable_plugin)
+
+
+def test_17_subtype_ordering():
+    system = pyitect.get_system()
+
+    for sub in system.iter_component_subtypes("a"):
+        tools.ok_(sub in ("a.b", "a.b.c"))
+
+    for prov in system.iter_component_providers("a"):
+        tools.eq_(len(prov), 3)
+        tools.ok_(prov[0] in ("a", "a.b", "a.b.c"))
+        tools.eq_(prov[1], "subtype_plugin")
+
+    def key1(prov):
+        return (prov[0].split(".")[-1])
+
+    def key2(prov):
+        return (0 if prov[0] == "a.b" else 1)
+
+    a = system.load("a")
+    tools.eq_(a(), "A")
+
+    a = system.load("a", key=key1, reverse=True)
+    tools.eq_(a(), "ABC")
+
+    a = system.load("a", key=key2)
+    tools.eq_(a(), "AB")
 
 if __name__ == "__main__":
     setup()

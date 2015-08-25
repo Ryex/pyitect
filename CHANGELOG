@@ -1,6 +1,16 @@
 ChangeLog
 ==========
 
+v2.0.1 (2015-8-25)
+------------------
+
+Bugfix:
+    - bug fix with issubcomponent
+    - System.load will not actually consider subcomponent
+New:
+    - expose load_component in the System class
+    - use key function to chouse component ins System.load
+
 v2.0.0 (2015-8-25)
 ------------------
 - Large API incompatible update

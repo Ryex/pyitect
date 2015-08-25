@@ -1,0 +1,15 @@
+{
+    "name": "subtype_plugin",
+    "author": "Ryex",
+    "version": "1.0.0",
+    "file": "subtype.py",
+    "consumes": {
+
+    },
+    "provides": {
+        "a": "a",
+        "a.b": "ab",
+        "a.b.c": "abc",
+        "x.y": "xy"
+    }
+}

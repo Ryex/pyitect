@@ -117,6 +117,56 @@ to be imported. For example is there is some system setup to be done.
     # end program / need fresh system?
     pyitect.destroy_system()
 
+Loading Components at run-time
+------------------------------
+
+Components are loaded at runtime via the
+:meth:`system.load <pyitect.System.load>` method or the
+:meth:`system.load_component <pyitect.System.load_component>` method
+
+the second method requires you to explicitly state a plugin a version to load
+from this is not a common use can and is intended mostly for use with
+:meth:`system.iter_component_providers <pyitect.System.iter_component_providers>`.
+
+The first method only needs the name of a component and will load any matching
+provider even if it is a subtype. This is the most common usecase
+
+::
+
+    # if "a" is not avalieable will also load a "a.b" or "a.c"
+    a = system.load("a")
+
+If the subtype matching is undesirable then it can be explicitly prevented with
+a key word argument
+
+::
+
+    # will only load a "a" not a "a.b"
+    a = system.load("a", subs=False)
+
+The default mode for selecting form among subtype is to sort alphanumerically
+and pick the first one. This is often not a desirable behavior in more complex
+situations. As such a `key` peramiter can be used
+
+::
+
+    def key(prov):
+        return (0 if prov[0] == "a.b" else 1)
+
+    # results in the loading of an "a.b"
+    a = system.load("a", key=key)
+
+your key function cna be as complex or as simple as you want. they are sorting
+the results of a call to :meth:`system.iter_component_providers <pyitect.System.iter_component_providers>`.
+which yeilds tuples that look like `(<component_name>, <plugin_name>, <version>)`
+
+if nessaccery there is a reverse kework perams to reverse the results of the sort
+
+::
+
+    # results in the load of the logest and highest subtype
+    a = system.load("a", reverse=True)
+
 
 
 Loading Plugins

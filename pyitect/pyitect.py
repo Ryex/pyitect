@@ -74,9 +74,6 @@ def destroy_system():
     """
     global _system
     if _system:
-        global _system
-        del _system
-        global _system
         _system = None
 
 
@@ -99,8 +96,8 @@ class Plugin(object):
         on_enable (None, str): either `None` or a str doted name of a function
             in the module
         path (str): an absolute path to the plugin folder
-        module (None, object): either `None` or the modlue object if the plugin
-            has been loaded already
+            module (None, object): either `None` or the modlue object if
+            the plugin has been loaded already
 
     """
 
@@ -392,21 +389,21 @@ class System(object):
         plugin (str): plugin version string (ie 'plugin_name:version')
 
         plugin_required (str): version string of the plugin that required the
-        loaded plugin (version string ie 'plugin_name:version')
+            loaded plugin (version string ie 'plugin_name:version')
 
         component_needed (str): the name of the component needed by the
-        requesting plugin
+            requesting plugin
 
     'component_loaded': (component, plugin_required, plugin_loaded)
         component (str): the name of the component loaded
 
         plugin_required (str, None): version string of the plugin that
-        required the loaded component
-        (version string ie 'plugin_name:version')
-        (might be None)
+            required the loaded component
+            (version string ie 'plugin_name:version')
+            (might be None)
 
         plugin_loaded (str): version string of the plugin that the component
-        was loaded from (version string ie 'plugin_name:version')
+            was loaded from (version string ie 'plugin_name:version')
 
     Pyitect keeps track of all the instances of the System class in
     `System.systems` which is a map of object id's to instances of System.
@@ -524,8 +521,8 @@ class System(object):
             conponent (str): the conponent name to act as a base
 
         Raises:
-            TypeError: if ``component` is niether a
-            :class:`Component` instance nor a string
+            TypeError: if `component` is niether a
+                :class:`Component` instance nor a string
         """
         if isinstance(component, Component):
             component = component.name
@@ -551,12 +548,23 @@ class System(object):
         `reqs` is a version requirement for the providers to meet.
         Defaults to any version
 
+        yeilds tuples that look like:
+        `(<component_name>, <plugin_name>, <version>)`
+
+        Examples:
+
+            >>> for t in iter_component_providers("foo", subs=True): print(t);
+            ("foo", "foo_plugin", "0.1.0")
+            ("foo", "foo_plugin2", "1.0.0")
+            ("foo.a", "foo.a_plugin", "0.1.0")
+            ("foo.a.b", "footastic", "10.0.0")
+
         Args:
             comp (str): component name to use as a base
             subs (bool): should subtypes be yeilded too?
             vers (bool): should all version be yeilded not just the highest?
             reqs (str, list, tuple): version spec string or list there of
-            all items are passed to a `Spec`
+                all items are passed to a `Spec`
         Raises:
             TypeError: if `comp` or `reqs` are passed wrong
         """
@@ -651,19 +659,19 @@ class System(object):
 
         Args:
             plugins (plugins): One or more plugins to enable.
-            Each argument can it self be a list or map of :class:`Plugin`
-            objects or a plain :class:`Plugin` object
+                Each argument can it self be a list or map of :class:`Plugin`
+                objects or a plain :class:`Plugin` object
 
         Raises:
             TypeError: If you try to pass a non :class:`Plugin` object
 
             PyitectDubError: If you try to enable a plugin
-            that provides duplicate conponent
+                that provides duplicate conponent
 
             PyitectOnEnableError: If There was an error in the on_enable
 
             PyitectLoadError: If there was an error loading a plugin
-            to call it's on_enable
+                to call it's on_enable
         """
         if len(plugins) == 1:
             plugins = plugins[0]
@@ -877,9 +885,24 @@ class System(object):
 
         return plugin, highest_valid
 
-    def _load_component(self, component, plugin, version,
-                        requires=None, request=None):
+    def load_component(self, component, plugin, version,
+                       requires=None, request=None):
+        """Loads a component
 
+        same end effect as :meth:`load` but requires an explicit name, plugin,
+        and version. no subtypes of the component are explored no other
+        provider is considered
+
+        Args:
+            component (str): component name to load
+            plugin (str): plugin name to load form
+            version (str, Version): Version to load
+
+        Raises:
+            TypeError: If things are passed worng
+            PyitectLoadError: if there is a exception during load
+            PyitectNotProvidedError: if the request can not be met
+        """
         # be sure not to load things twice, but besure the components is loaded
         # and saved
         if not isinstance(component, basestring):
@@ -1001,14 +1024,14 @@ class System(object):
             version (str, Version): version to load
 
             requires (dict, None): a mapping of component names
-            to version requierments to use during the load
+                to version requierments to use during the load
 
             request (str, None): name of the version string of the plugin
-            that requested a component from this plugin.
-            `None` if not requested.
+                that requested a component from this plugin.
+                `None` if not requested.
 
             comp (str): name of the component needed by teh requesting plugin.
-            `None` if not requested.
+                `None` if not requested.
 
         Returns:
             the loaded module object
@@ -1035,7 +1058,30 @@ class System(object):
         plugin_obj = self.loaded_plugins[plugin_key]
         return plugin_obj
 
-    def load(self, component, requires=None, request=None, bypass=False):
+    def resolve_providers(self, component, subs=True, key=None, reverse=False):
+        """Resolve what avalible component is used
+
+        will create a lost of a component and it's subcomponents to sorted with
+        `sorted(component key=key)` and return the first item
+
+        the default, and possibly undesierable behavior,
+        is alphabetical order of component names
+
+        Args:
+            key(func, None): a key function to sort the componet types and
+                subtypes that are valid so you can select the correct one
+        """
+        provs = sorted(
+            self.iter_component_providers(component, subs=subs),
+            key=key, reverse=reverse)
+        if len(provs) < 1:
+            raise PyitectNotProvidedError(
+                "Component '%s' not provided by any enabled plugins"
+                % (component,))
+        return provs[0]
+
+    def load(self, component, requires=None, request=None, bypass=False,
+             subs=True, key=None, reverse=False):
         """Load and return a component object
 
         processes loading and returns the component by name,
@@ -1045,16 +1091,30 @@ class System(object):
         a run time error.
         bypass lets the call bypass the system configuration
 
+        internaly uses :meth:`iter_component_providers` to create list of
+        viable components. basialy calls
+        `sorted(iter_component_providers(component subs=subs), key=key)[0]`
+        to get the component to use.
+
         Args:
-            component (str): name of component to load
+            component (str): Name of component to load
 
-            requires (dict, None): a mapping of component names
-            to version requierments to use during the load
+            requires (dict, None): A mapping of component names
+                to version requierments to use during the load
 
-            request (str, None): the name of the requesting plugin.
-            `None` if not requested
+            request (str, None): The name of the requesting plugin.
+                `None` if not requested
 
-            bypass (bool): ignore the system configured version requierments
+            bypass (bool): Ignore the system configured version requierments
+
+            subs (bool): should sub components be considered?
+
+            key (func, None): Key function to use to compaire component
+                provider tuples from :meth:`iter_component_providers` in a
+                `sorted` call.write the key func so that the item you
+                want will be at index 0
+
+            reverse (bool): reverse sorting of components
 
         Returns:
             the loaded component object
@@ -1066,10 +1126,8 @@ class System(object):
         # set default requirements
         plugin = version = plugin_req = ""
         version_spec = Spec("*")
-        if component not in self.component_map:
-            raise PyitectNotProvidedError(
-                "Component '%s' not provided by any enabled plugins"
-                % (component,))
+        component, plugin, version = self.resolve_providers(
+            component, subs=subs, key=key, reverse=reverse)
 
         # merge the systems config and the passed plugin requirements (if they
         # were passed) to get the most relavent requirements
@@ -1084,11 +1142,11 @@ class System(object):
         if component in reqs:
             plugin_req, version_spec = expand_version_req(reqs[component])
 
-        # get the plugin and version to load
-        plugin, version = self.resolve_highest_match(
-            component, plugin_req, version_spec)
+            # get the plugin and version to load
+            plugin, version = self.resolve_highest_match(
+                component, plugin_req, version_spec)
 
-        comp_obj = self._load_component(
+        comp_obj = self.load_component(
             component, plugin, version, requires=reqs)
 
         return comp_obj
@@ -1102,14 +1160,15 @@ class System(object):
 
         Args:
             plugin (str): name of plugin to find
-            version (None, str, Version): if provided load a spesfic version
+                version (None, str, Version): if provided load a spesfic
+                version
 
         Returns:
             loaded module object
 
         Raises:
             TypeError: if provideing a version that is not either a `str` or
-            a :class:`Version`
+                a :class:`Version`
             PyitectError: if the Plugin can't be found
             PyitectLoadError: plugin module is not loaded yet
         """
@@ -1266,10 +1325,10 @@ def issubcomponent(comp1, comp2):
     comp1_parts = comp1.split(".")
     comp2_parts = comp2.split(".")
 
-    if len(comp2_parts) < len(comp1_parts):
+    if len(comp1_parts) < len(comp2_parts):
         return False
 
-    if not tuple(comp1_parts) == tuple(comp2_parts[:len(comp1_parts)]):
+    if not tuple(comp1_parts[:len(comp2_parts)]) == tuple(comp2_parts):
         return False
 
     return True
@@ -1334,7 +1393,7 @@ class PyitectError(Exception):
 
     def write(self, stream=None, indentation='  '):
         stream = sys.stderr if stream is None else stream
-        for line in self.causeTree(indentation):
+        for line in self.causeChain(indentation):
             stream.write(line)
 
 
