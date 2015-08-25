@@ -66,7 +66,9 @@ After you have your list of Plugin objects you can filer it how you want
 to enable only the plugins you want to. When your ready.
 
 ::
+
     system.enable_plugins(plugins)
+
 
 `enable_plugins` can take multiple objects and any individual
  can by a iterable or map of :class:`Plugin <pyitect.Plugin>` objects.
@@ -74,7 +76,9 @@ to enable only the plugins you want to. When your ready.
 After you have some plugins enabled loading a provided component is as easy as
 
 ::
+
     Bar = system.load("Bar")
+
 
 The general idea is to create a system, search some path or paths for plugins
 and then enable them.
@@ -106,11 +110,13 @@ a plugin requires more than just making it's components available
 to be imported. For example is there is some system setup to be done.
 
 ::
+
     pyitect.build_system(config, enable_yaml=False)
     system = pyitect.get_system()
     # ... do stuff
     # end program / need fresh system?
     pyitect.destroy_system()
+
 
 
 Loading Plugins
@@ -122,11 +128,13 @@ Plugins are loaded on demand when a component is loaded via
 
     system.load("<component name>")
 
+
 a plugin can also be explicitly loaded via
 
 ::
 
     system.load_plugin(plugin, version)
+
 
 where `plugin` is the plugin name and `version` is the version
 

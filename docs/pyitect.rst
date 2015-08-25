@@ -41,6 +41,13 @@ Module contents
         :members:
         :undoc-members:
 
+    .. autofunction:: get_system
+
+    .. autofunction:: build_system
+
+    .. autofunction:: destroy_system
+
+
     .. autofunction:: issubcomponent
 
     .. autofunction:: get_unique_name
@@ -48,3 +55,16 @@ Module contents
     .. autofunction:: gen_version
 
     .. autofunction:: expand_version_req
+
+    
+    .. autoexception:: PyitectError
+
+    .. autoexception:: PyitectNotProvidedError
+
+    .. autoexception:: PyitectNotMetError
+
+    .. autoexception:: PyitectLoadError
+
+    .. autoexception:: PyitectOnEnableError
+
+    .. autoexception:: PyitectDupError
