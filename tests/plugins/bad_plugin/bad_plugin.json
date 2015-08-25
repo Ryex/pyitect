@@ -1,8 +1,8 @@
 {
-    "name": "dead_plugin",
+    "name": "bad_plugin",
     "author": "Ryex",
     "version": "0.0.1",
-    "file": "dead_plugin.py",
+    "file": "bad_plugin.py",
     "mode": "exec",
     "consumes": {
 

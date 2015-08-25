@@ -14,59 +14,10 @@ sys.path.insert(0, pyitect_path)
 
 import pyitect
 
-folder_path = os.path.dirname(os.path.abspath(__file__))
-
 system = None
 pluginFoundTriggered = None
 pluginLoadTriggered = None
 componentLoadTriggered = None
-
-
-def load_component(name):
-    global system
-    return system.load(name)
-
-
-def onPluginFound(path, plugin):
-    """
-    path : the full path to the folder containing the plugin
-    plugin : plugin version string (ie 'plugin_name:version')
-    """
-    global pluginFoundTriggered
-    print("plugin `%s` found at `%s`" % (plugin, path))
-    pluginFoundTriggered = True
-
-
-def onPluginLoad(plugin, plugin_required, component_needed):
-    """
-    plugin : plugin version string (ie 'plugin_name:version')
-    plugin_required: version string of the plugin that required the loaded
-        plugin (version string ie 'plugin_name:version') (might be None)
-    component_needed: the name of the component needed by the requesting plugin
-    """
-    global pluginLoadTriggered
-    print(
-        "plugin `%s` was loaded by plugin `%s` "
-        "during a request for the `%s` component"
-        % (plugin, plugin_required, component_needed)
-        )
-    pluginLoadTriggered = True
-
-
-def onComponentLoad(component, plugin_required, plugin_loaded):
-    """
-    component : the name of the component loaded
-    plugin_required : version string of the plugin that required the loaded
-        component (version string ie 'plugin_name:version') (might be None)
-    plugin_loaded : version string of the plugin that the component was loaded
-        from (version string ie 'plugin_name:version')
-    """
-    global componentLoadTriggered
-    print(
-        "Component `%s` loaded, required by `%s`, loaded from `%s`"
-        % (component, plugin_required, plugin_loaded)
-        )
-    componentLoadTriggered = True
 
 
 def setup():
@@ -82,6 +33,47 @@ def setup():
 def test_01_bind_events():
     global system
     tools.ok_(not system.events)
+
+    def onPluginFound(path, plugin):
+        """
+        path : the full path to the folder containing the plugin
+        plugin : plugin version string (ie 'plugin_name:version')
+        """
+        global pluginFoundTriggered
+        print("plugin `%s` found at `%s`" % (plugin, path))
+        pluginFoundTriggered = True
+
+    def onPluginLoad(plugin, plugin_required, component_needed):
+        """
+        plugin : plugin version string (ie 'plugin_name:version')
+        plugin_required: version string of the plugin that required the loaded
+            plugin (version string ie 'plugin_name:version') (might be None)
+        component_needed: the name of the component needed by the requesting
+        plugin
+        """
+        global pluginLoadTriggered
+        print(
+            "plugin `%s` was loaded by plugin `%s` "
+            "during a request for the `%s` component"
+            % (plugin, plugin_required, component_needed)
+            )
+        pluginLoadTriggered = True
+
+    def onComponentLoad(component, plugin_required, plugin_loaded):
+        """
+        component : the name of the component loaded
+        plugin_required : version string of the plugin that required the loaded
+            component (version string ie 'plugin_name:version') (might be None)
+        plugin_loaded : version string of the plugin that the component was
+        loaded
+            from (version string ie 'plugin_name:version')
+        """
+        global componentLoadTriggered
+        print(
+            "Component `%s` loaded, required by `%s`, loaded from `%s`"
+            % (component, plugin_required, plugin_loaded)
+            )
+        componentLoadTriggered = True
 
     system.bind_event('plugin_found', onPluginFound)
     system.bind_event('plugin_loaded', onPluginLoad)
@@ -109,7 +101,7 @@ def test_03_enable_plugins():
     tools.ok_(not system.components)
     tools.ok_(not system.enabled_plugins)
 
-    plugins_filter = ["dead_plugin"]
+    plugins_filter = ["bad_plugin"]
     # get all plugin configs that arn't named dead_plugin
     # collect plugins[<name>][<version_str>] for all names n in plugins for all
     # versions v in plugins[n] if name not in filter
@@ -128,12 +120,20 @@ def test_03_enable_plugins():
 
 def test_04_filter_plugins():
     global system
-    tools.ok_("dead_plugin" in system.plugins)
-    tools.ok_("dead_plugin" not in system.enabled_plugins)
+    tools.ok_("bad_plugin" in system.plugins)
+    tools.ok_("bad_plugin" not in system.enabled_plugins)
 
 
-def test_05_fail_to_load_dead():
-    tools.assert_raises(RuntimeError, load_component, "foobarbar")
+def test_05_fail_to_load_filtered():
+
+    def load_component(name):
+        global system
+        return system.load(name)
+
+    tools.assert_raises(
+        pyitect.PyitectNotProvidedError,
+        load_component,
+        "foobarbar")
 
 
 def test_06_provide_foo():
@@ -224,3 +224,26 @@ def test_15_unique_module_names():
     print(TestClass.__module__)
     tools.assert_not_equal(
         TestClass.__module__, "relative_plugin.relative_test")
+
+
+def test_16_bad_plugin_fails():
+    global system
+
+    def enable_plugin():
+        global system
+        system.load_plugin("bad_plugin", "0.0.1")
+
+    tools.assert_raises(
+        pyitect.PyitectLoadError,
+        enable_plugin)
+
+if __name__ == "__main__":
+    setup()
+    tests = []
+    names = dict(globals())
+    for name in names:
+        if name[:4] == "test" and callable(names[name]):
+            tests.append(name)
+    for test in sorted(tests):
+        print("Calling %s:" % (test,))
+        names[test]()
