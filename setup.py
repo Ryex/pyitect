@@ -37,8 +37,8 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     # metadata for upload to PyPI
-    author='Benjamin "Ryex" Powers',
-    author_email="Ryexander+pyitect@gmail.com",
+    author='Rachel "Ryex" Powers',
+    author_email="powers.e.rachel+pyitect@gmail.com",
     description=(
         "A simple system for structuring a modeler project "
         "architecture via plugin like modules, uses the new "

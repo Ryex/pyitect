@@ -30,7 +30,7 @@ LICENSE
 *******
 
 
-Copyright (c) 2014, Benjamin "Ryex" Powers ryexander@gmail.com
+Copyright (c) 2020, Rachel "Ryex" Powers powers.e.rachel@gmail.com
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
