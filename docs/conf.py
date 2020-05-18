@@ -70,8 +70,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Pyitect'
-copyright = '2015, Benjamin "Ryex" Powers'
-author = 'Benjamin "Ryex" Powers'
+copyright = '2020, Rachel "Ryex" Powers'
+author = 'Rachel "Ryex" Powers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
