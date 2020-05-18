@@ -65,11 +65,13 @@ verify-3.8:
     PYVER: "3.8"
     
 pages:
+  image: "python:latest"
   stage: "doc"
   script:
-    - pip install sphinx sphinx-rtd-theme
-    - cd doc ; make html
-    - mv _build/html/ ../public/
+    - "pip install --upgrade pip"
+    - "pip install sphinx sphinx-rtd-theme"
+    - "cd doc ; make html"
+    - "mv _build/html/ ../public/"
   artifacts:
     paths:
       - public
